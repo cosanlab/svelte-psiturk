@@ -1,13 +1,18 @@
 <script>
+  // This is the main ThoughTagging component that gets rendered within Experiment.svelte. It takes as an "argument" a "src" value from Experiment.svelte that tells it which audo file to render
   import Peaks from 'peaks.js';
-  import { onMount } from 'svelte';
-  import { db } from './firebase.js';
+  import { onMount, createEventDispatcher } from 'svelte';
+  import { db } from '../firebase.js';
 
+  // This is how the Experiment page can tell TagThought which src to display in Peaksjs. It's like a function argument to TagThought
+  export let src;
+  export let trialNumber;
   let peaksInstance;
   let segments = [];
   let selectedSegmentId;
   let rowSelected = false;
   let segmentPrevMax = 0;
+  const dispatch = createEventDispatcher();
 
   // After Svelte has created the webpage, initialize the peaks.js waveform player and all of its event-handlers. Also make sure the segments variable gets updated whenever a user manipulates the waveform player
   onMount(() => {
@@ -24,7 +29,7 @@
       outMarkerColor: '#3d3d3d'
     };
     // Initialize peaks.js UI
-    peaksInstance = Peaks.init(options, function (err, peakrs) {
+    peaksInstance = Peaks.init(options, (err) => {
       if (err) {
         console.error(err);
       } else {
@@ -33,19 +38,19 @@
       }
     });
     // Add some built-in event handlers for mouse events for segments
-    peaksInstance.on('segments.mouseleave', function (segment) {
+    peaksInstance.on('segments.mouseleave', (segment) => {
       segments = peaksInstance.segments.getSegments();
     });
-    peaksInstance.on('segments.click', function (segment) {
+    peaksInstance.on('segments.click', (segment) => {
       segments = peaksInstance.segments.getSegments();
     });
-    peaksInstance.on('segments.dragged', function (segment) {
+    peaksInstance.on('segments.dragged', (segment) => {
       segments = peaksInstance.segments.getSegments();
     });
   });
 
   // Grab the start and end time for each thought and save them into firebase
-  function finish () {
+  function finish() {
     // if (segments) {
     //   if (segments.length < 2) {
     //     alert("Please tag a few more thoughts");
@@ -65,25 +70,24 @@
     //       });
     //   }
     // }
-    console.log('finished');
-    window.top.postMessage('finished', '*');
+    dispatch('next');
   }
 
   // Store a new segment on button click
-  function addSegment () {
+  function addSegment() {
     peaksInstance.segments.add({
       startTime: peaksInstance.player.getCurrentTime(),
       endTime: peaksInstance.player.getCurrentTime() + 5,
-      labelText: 'Thought ' + segmentPrevMax.toString(),
+      labelText: `Thought ${segmentPrevMax.toString()}`,
       editable: true
     });
     // Update the variable that stores all the segments for dynamic rendering
     segments = peaksInstance.segments.getSegments();
-    segmentPrevMax = segmentPrevMax + 1;
+    segmentPrevMax += 1;
   }
 
   // Select a segment based on a table row that get clicked
-  function selectSegment (ev) {
+  function selectSegment(ev) {
     // Get all rows
     const rows = document.getElementsByClassName('table-row');
     // Get click row
@@ -103,18 +107,21 @@
       rowSelected = true;
     }
     // Save the segment id
-    selectedSegmentId = parseInt(row.querySelector('td.segment-id').innerText);
-    selectedSegmentId = 'peaks.segment.' + selectedSegmentId.toString();
+    selectedSegmentId = parseInt(
+      row.querySelector('td.segment-id').innerText,
+      10
+    );
+    selectedSegmentId = `peaks.segment.${selectedSegmentId.toString()}`;
   }
 
   // Play a selected segment on button click
-  function playSegment () {
+  function playSegment() {
     const segment = peaksInstance.segments.getSegment(selectedSegmentId);
     peaksInstance.player.playSegment(segment);
   }
 
   // Delete a selected segment on button click
-  function deleteSegment () {
+  function deleteSegment() {
     peaksInstance.segments.removeById(selectedSegmentId);
     // Clear selection from all other rows and hide button
     const rows = document.getElementsByClassName('table-row');
@@ -126,7 +133,7 @@
   }
 
   // Print all segments to console on button click; just for debugging
-  function seeSegments () {
+  function seeSegments() {
     console.log(segments);
   }
 </script>
@@ -145,42 +152,12 @@
 <div class="container">
   <div class="columns is-centered">
     <div class="column is-three-quarters">
-      <h1 class="title">Thought Segmentation</h1>
-      <p class="is-size-5">
-        In this task, you will listen to a series of audio files (~2 min) in
-        which you will hear people describing characters from a television
-        drama. The goal of this task is to divide the audio into separate speech
-        segments or thoughts. Follow the directions below to perform the task.
-        <b>Do not refresh your browser</b>
-      </p>
-      <div class="columns">
-        <div class="column is-10 is-offset-1">
-          <ol>
-            <li>Click the play button to start listening to the audio.</li>
-            <li>
-              Pay close attention to where there are natural breaks in a
-              person’s speech, demarcating a separate thought.
-            </li>
-            <li>
-              Click Tag Thought, to tag a speech segment or “thought”. You can
-              adjust the start and end times by dragging the sliders. Add
-              segments as you continue to listen to the audio.
-            </li>
-            <li>
-              You can go back and edit segments by clicking on then in the
-              table.
-            </li>
-            <li>Click Finish to continue to the next audio file.</li>
-          </ol>
-        </div>
-      </div>
+      <h1 class="title">Recording #{trialNumber}</h1>
       <div id="waveform-container" />
       <div class="columns">
         <div class="column is-one-quarter">
           <audio id="audio" controls="controls">
-            <source
-              src="https://dl.dropboxusercontent.com/s/vvq50nz47pndx2b/s12_JulieTaylor.wav"
-              type="audio/wav" />
+            <source {src} type="audio/wav" />
             Your browser does not support the audio element.
           </audio>
         </div>

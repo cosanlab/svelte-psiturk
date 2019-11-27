@@ -12,9 +12,6 @@
   "editor.detectIndentation": true,
   "editor.lineHeight": 19,
   "editor.formatOnSave": true,
-  "javascript.validate.enable": false,
-  "standard.autoFixOnSave": true,
-  "standard.semistandard": true,
-  "eslint.autoFixOnSave": true,
-  "svelte.plugin.typescript.enable": false
+  "svelte.plugin.typescript.enable": false,
+  // "eslint.autoFixOnSave": true,
 }
