@@ -1,7 +1,7 @@
 <script>
-  import Peaks from "peaks.js";
-  import { onMount } from "svelte";
-  import { db } from "./firebase.js";
+  import Peaks from 'peaks.js';
+  import { onMount } from 'svelte';
+  import { db } from './firebase.js';
 
   let peaksInstance;
   let segments = [];
@@ -12,36 +12,40 @@
   // After Svelte has created the webpage, initialize the peaks.js waveform player and all of its event-handlers. Also make sure the segments variable gets updated whenever a user manipulates the waveform player
   onMount(() => {
     const options = {
-      container: document.getElementById("waveform-container"),
-      mediaElement: document.getElementById("audio"),
+      container: document.getElementById('waveform-container'),
+      mediaElement: document.getElementById('audio'),
       webAudio: {
         audioContext: new AudioContext()
       },
       keyboard: false,
-      pointMarkerColor: "#006eb0",
+      pointMarkerColor: '#006eb0',
       showPlayheadTime: true,
-      inMarkerColor: "#999999",
-      outMarkerColor: "#3d3d3d"
+      inMarkerColor: '#999999',
+      outMarkerColor: '#3d3d3d'
     };
     // Initialize peaks.js UI
-    peaksInstance = Peaks.init(options, function(err, peakrs) {
-      console.log("Peaks instance ready");
-      segments = peaksInstance.segments.getSegments();
+    peaksInstance = Peaks.init(options, function (err, peakrs) {
+      if (err) {
+        console.error(err);
+      } else {
+        console.log('Peaks instance ready');
+        segments = peaksInstance.segments.getSegments();
+      }
     });
     // Add some built-in event handlers for mouse events for segments
-    peaksInstance.on("segments.mouseleave", function(segment) {
+    peaksInstance.on('segments.mouseleave', function (segment) {
       segments = peaksInstance.segments.getSegments();
     });
-    peaksInstance.on("segments.click", function(segment) {
+    peaksInstance.on('segments.click', function (segment) {
       segments = peaksInstance.segments.getSegments();
     });
-    peaksInstance.on("segments.dragged", function(segment) {
+    peaksInstance.on('segments.dragged', function (segment) {
       segments = peaksInstance.segments.getSegments();
     });
   });
 
   // Grab the start and end time for each thought and save them into firebase
-  function finish() {
+  function finish () {
     // if (segments) {
     //   if (segments.length < 2) {
     //     alert("Please tag a few more thoughts");
@@ -61,16 +65,16 @@
     //       });
     //   }
     // }
-    console.log("finished");
-    window.top.postMessage("finished", "*");
+    console.log('finished');
+    window.top.postMessage('finished', '*');
   }
 
   // Store a new segment on button click
-  function addSegment() {
+  function addSegment () {
     peaksInstance.segments.add({
       startTime: peaksInstance.player.getCurrentTime(),
       endTime: peaksInstance.player.getCurrentTime() + 5,
-      labelText: "Thought " + segmentPrevMax.toString(),
+      labelText: 'Thought ' + segmentPrevMax.toString(),
       editable: true
     });
     // Update the variable that stores all the segments for dynamic rendering
@@ -79,51 +83,50 @@
   }
 
   // Select a segment based on a table row that get clicked
-  function selectSegment(ev) {
+  function selectSegment (ev) {
     // Get all rows
-    let rows = document.getElementsByClassName("table-row");
+    const rows = document.getElementsByClassName('table-row');
     // Get click row
-    let row = ev.target.parentNode;
+    const row = ev.target.parentNode;
     // If clicked row already has class unselected it and all other rows
-    if (row.className === "table-row is-selected") {
-      for (let r of rows) {
-        r.className = "table-row";
+    if (row.className === 'table-row is-selected') {
+      for (const r of rows) {
+        r.className = 'table-row';
       }
       rowSelected = false;
-    }
-    // Otherwise unselect everything else first then select this one
-    else {
-      for (let r of rows) {
-        r.className = "table-row";
+    } else {
+      // Otherwise unselect everything else first then select this one
+      for (const r of rows) {
+        r.className = 'table-row';
       }
-      row.className += " is-selected";
+      row.className += ' is-selected';
       rowSelected = true;
     }
     // Save the segment id
-    selectedSegmentId = parseInt(row.querySelector("td.segment-id").innerText);
-    selectedSegmentId = "peaks.segment." + selectedSegmentId.toString();
+    selectedSegmentId = parseInt(row.querySelector('td.segment-id').innerText);
+    selectedSegmentId = 'peaks.segment.' + selectedSegmentId.toString();
   }
 
   // Play a selected segment on button click
-  function playSegment() {
-    let segment = peaksInstance.segments.getSegment(selectedSegmentId);
+  function playSegment () {
+    const segment = peaksInstance.segments.getSegment(selectedSegmentId);
     peaksInstance.player.playSegment(segment);
   }
 
   // Delete a selected segment on button click
-  function deleteSegment() {
+  function deleteSegment () {
     peaksInstance.segments.removeById(selectedSegmentId);
     // Clear selection from all other rows and hide button
-    let rows = document.getElementsByClassName("table-row");
-    for (let r of rows) {
-      r.className = "table-row";
+    const rows = document.getElementsByClassName('table-row');
+    for (const r of rows) {
+      r.className = 'table-row';
     }
     rowSelected = false;
     segments = peaksInstance.segments.getSegments();
   }
 
   // Print all segments to console on button click; just for debugging
-  function seeSegments() {
+  function seeSegments () {
     console.log(segments);
   }
 </script>

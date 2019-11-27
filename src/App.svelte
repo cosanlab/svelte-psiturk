@@ -1,5 +1,5 @@
 <script>
-  import TagThought from "./TagThought.svelte";
+  import TagThought from './TagThought.svelte';
 </script>
 
 <style>

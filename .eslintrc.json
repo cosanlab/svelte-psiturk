@@ -1,0 +1,33 @@
+{
+  "extends": "semistandard",
+  "parserOptions": {
+    "ecmaVersion": 2019,
+    "sourceType": "module"
+  },
+  "env": {
+    "es6": true,
+    "browser": true
+  },
+  "plugins": [
+    "svelte3"
+  ],
+  "rules": {
+    "no-var": "error",
+    "no-console": "off",
+    "no-unused-vars": 1
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*.svelte"
+      ],
+      "rules": {
+        "import/no-duplicates": "off",
+        "import/first": "off",
+        "import/no-mutable-exports": "off",
+        "import/no-unresolved": "off"
+      }
+    }
+  ],
+  "settings": {}
+}
