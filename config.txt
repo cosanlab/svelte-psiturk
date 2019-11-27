@@ -1,0 +1,45 @@
+[HIT Configuration]
+title = Title of your HIT
+description = Description of your HIT
+amt_keywords = Keywords, For, Your, HIT
+lifetime = 24
+us_only = true
+approve_requirement = 95
+number_hits_approved = 0
+require_master_workers = false
+contact_email_on_error = youremail@gmail.com
+ad_group = Your Ad Group
+psiturk_keywords = keywords for your task
+organization_name = New Great University
+browser_exclude_rule = MSIE, mobile, tablet, bot
+allow_repeats = false
+
+[Database Parameters]
+database_url = sqlite:///participants.db
+table_name = mturk_metadata
+
+[Server Parameters]
+host = localhost
+#host = 0.0.0.0 # for running live
+port = 22362
+cutoff_time = 30
+#cutoff_time = 30 # total experiment time 
+logfile = server.log
+loglevel = 2
+debug = true
+login_username = examplename
+login_pw = examplepassword
+threads = auto
+
+[Task Parameters]
+experiment_code_version = 1.0
+num_conds = 1
+num_counters = 1
+
+[Shell Parameters]
+launch_in_sandbox_mode = true
+persistent_history_file = .psiturk_history
+#bonus_message = "Thanks for participating!"
+
+use_psiturk_ad_server = true
+ad_location = false
