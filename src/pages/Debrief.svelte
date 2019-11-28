@@ -1,6 +1,9 @@
 <script>
   // This is the debrief page in which we should collect any post survey questions. There's a single button that should save reponses to firebase and then tell PsiTurk we're done.
 
+  // TODO: add endtime to Firebase on component mount
+  // TODO: add survey questions
+
   const submitHIT = () => {
     // TODO: Save question responses to firebase, then call code below
     window.top.postMessage('finished', '*');

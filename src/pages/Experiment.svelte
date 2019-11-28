@@ -1,5 +1,7 @@
 <script>
   // This is the main experiment page. It should get the number of trials and audio filepaths from firebase and then create a TagThought component for each one. Currently it just renders a single TagThought component with a hardcoded audio file
+  // TODO: track trial number within firebase
+  // TODO: get list of stimuli from firebase
   import { createEventDispatcher } from 'svelte';
   import TagThought from '../components/TagThought.svelte';
 

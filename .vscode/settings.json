@@ -13,5 +13,5 @@
   "editor.lineHeight": 19,
   "editor.formatOnSave": true,
   "svelte.plugin.typescript.enable": false,
-  // "eslint.autoFixOnSave": true,
+  "javascript.preferences.quoteStyle": "single",
 }
