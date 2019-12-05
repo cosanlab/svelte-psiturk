@@ -10,6 +10,7 @@ This project scaffold uses [SvelteJS](https://svelte.dev/) as a frontend UI + [P
     - [SvelteJS Development](#working-on-sveltejs-features)
 - [Deploying Live](#deploying-live)
 - [Application Structure](#application-structure)
+    - [Data management](#data-management)
 
 # Getting Started
 
@@ -55,3 +56,9 @@ PsiTurk and SvelteJS handle distinct non-overlapping responsibilities as users m
 PsiTurk responsibilities are outlined in purple and are primarily concerned with Mturk flow and Mturk metadata storage in a SQL database. SvelteJS handles experiment specific flow and stores experiment specific data in Google Firebase. 
 
 ![](/user_flow.png)
+
+## Data Management
+
+All data is stored in firebase database including participant responses, what trial they're currently on, and application state (i.e. whether a participant is viewing the instructions, completing the experiment, doing the debrief, etc). 
+
+All stimuli are stored in firebase storage and accessed directly to make it easy to render audio files in HTML with fixed URLs.

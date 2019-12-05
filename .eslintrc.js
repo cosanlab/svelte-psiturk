@@ -23,7 +23,11 @@ module.exports = {
     'prefer-template': 1,
     'quotes': 1,
     'no-trailing-spaces': 1,
-    'operator-linebreak': 1
+    'operator-linebreak': 1,
+    'no-alert': 0,
+    'no-underscore-dangle': 0,
+    'import/no-extraneous-dependencies': 0,
+    'object-curly-newline': 0
   },
   overrides: [
     {

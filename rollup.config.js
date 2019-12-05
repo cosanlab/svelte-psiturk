@@ -6,7 +6,6 @@ import commonjs from 'rollup-plugin-commonjs';
 import livereload from 'rollup-plugin-livereload';
 import babel from 'rollup-plugin-babel';
 import { terser } from 'rollup-plugin-terser';
-import path from 'path';
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -62,7 +61,7 @@ export default {
     postcss(),
     resolve({ browser: true }),
     commonjs(),
-    !production && livereload({ watch:'static/app', port: 8080 }),
+    !production && livereload({ watch: 'static/app', port: 8080 }),
     production && terser()
   ],
   watch: {

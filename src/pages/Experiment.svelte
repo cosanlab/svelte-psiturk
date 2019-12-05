@@ -1,26 +1,59 @@
 <script>
-  // This is the main experiment page. It should get the number of trials and audio filepaths from firebase and then create a TagThought component for each one. Currently it just renders a single TagThought component with a hardcoded audio file
-  // TODO: track trial number within firebase
-  // TODO: get list of stimuli from firebase
+  // This is the main experiment page. It takes as input trialOrder, which gets passed in from App.svelte, which itself gets it from firebase. Then it looks at the current trial number the participant is on, gets the audio file URL and passes that info as parameters to the TagThought component.
   import { createEventDispatcher } from 'svelte';
+  import { db, storage, params } from '../utils.js';
   import TagThought from '../components/TagThought.svelte';
 
-  let currentFile = 0;
-  const audioFiles = [
-    'https://dl.dropboxusercontent.com/s/vvq50nz47pndx2b/s12_JulieTaylor.wav',
-    'https://dl.dropboxusercontent.com/s/vvq50nz47pndx2b/s12_JulieTaylor.wav'
-  ];
-  $: src = audioFiles[currentFile];
-  $: trialNumber = currentFile + 1;
+  // Get trialOrder from App.svelte, which pulls it from firebase
+  export let trialOrder;
+
+  // Local variables
+  let currentTrial;
+  let fileName;
   const dispatch = createEventDispatcher();
 
+  // Function to get a firebase storage URL for a specific audio file that we can ultimately render with Peaks JS
+  // eslint-disable-next-line consistent-return
+  const generateFileURL = async () => {
+    try {
+      fileName = trialOrder[currentTrial - 1];
+      const file = storage.refFromURL(
+        `gs://thought-segmentation.appspot.com/${fileName}`
+      );
+      const url = await file.getDownloadURL();
+      return url;
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // Before rendering anything see what trial we should be rendering. Because this is an async function we call immediately to dynamically show a loading screen before we get the data in the HTML below
+  let filePromise = (async () => {
+    try {
+      const resp = await db
+        .collection('participants')
+        .doc(params.workerId)
+        .get();
+      currentTrial = resp.data().currentTrial;
+      return await generateFileURL();
+    } catch (error) {
+      return console.error(error);
+    }
+  })();
+
+  // Function to try to get the next trial's audio file or tell App.svelte to the experiment
   const getNextAudioFile = () => {
-    if (currentFile + 1 === audioFiles.length) {
+    if (currentTrial === trialOrder.length) {
       dispatch('finished');
     } else {
-      currentFile += 1;
+      currentTrial += 1;
+      filePromise = generateFileURL();
     }
   };
 </script>
 
-<TagThought {src} {trialNumber} on:next={getNextAudioFile} />
+{#await filePromise}
+  <h3 class="title is-3">Preparing Trial...</h3>
+{:then src}
+  <TagThought {src} {currentTrial} {fileName} on:next={getNextAudioFile} />
+{/await}

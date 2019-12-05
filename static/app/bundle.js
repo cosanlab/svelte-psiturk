@@ -1444,382 +1444,6 @@ var app = (function () {
     }
   });
 
-  // `RegExp.prototype.flags` getter implementation
-  // https://tc39.github.io/ecma262/#sec-get-regexp.prototype.flags
-  var regexpFlags = function () {
-    var that = anObject(this);
-    var result = '';
-    if (that.global) result += 'g';
-    if (that.ignoreCase) result += 'i';
-    if (that.multiline) result += 'm';
-    if (that.dotAll) result += 's';
-    if (that.unicode) result += 'u';
-    if (that.sticky) result += 'y';
-    return result;
-  };
-
-  var nativeExec = RegExp.prototype.exec;
-  // This always refers to the native implementation, because the
-  // String#replace polyfill uses ./fix-regexp-well-known-symbol-logic.js,
-  // which loads this file before patching the method.
-  var nativeReplace = String.prototype.replace;
-
-  var patchedExec = nativeExec;
-
-  var UPDATES_LAST_INDEX_WRONG = (function () {
-    var re1 = /a/;
-    var re2 = /b*/g;
-    nativeExec.call(re1, 'a');
-    nativeExec.call(re2, 'a');
-    return re1.lastIndex !== 0 || re2.lastIndex !== 0;
-  })();
-
-  // nonparticipating capturing group, copied from es5-shim's String#split patch.
-  var NPCG_INCLUDED = /()??/.exec('')[1] !== undefined;
-
-  var PATCH = UPDATES_LAST_INDEX_WRONG || NPCG_INCLUDED;
-
-  if (PATCH) {
-    patchedExec = function exec(str) {
-      var re = this;
-      var lastIndex, reCopy, match, i;
-
-      if (NPCG_INCLUDED) {
-        reCopy = new RegExp('^' + re.source + '$(?!\\s)', regexpFlags.call(re));
-      }
-      if (UPDATES_LAST_INDEX_WRONG) lastIndex = re.lastIndex;
-
-      match = nativeExec.call(re, str);
-
-      if (UPDATES_LAST_INDEX_WRONG && match) {
-        re.lastIndex = re.global ? match.index + match[0].length : lastIndex;
-      }
-      if (NPCG_INCLUDED && match && match.length > 1) {
-        // Fix browsers whose `exec` methods don't consistently return `undefined`
-        // for NPCG, like IE8. NOTE: This doesn' work for /(.?)?/
-        nativeReplace.call(match[0], reCopy, function () {
-          for (i = 1; i < arguments.length - 2; i++) {
-            if (arguments[i] === undefined) match[i] = undefined;
-          }
-        });
-      }
-
-      return match;
-    };
-  }
-
-  var regexpExec = patchedExec;
-
-  _export({ target: 'RegExp', proto: true, forced: /./.exec !== regexpExec }, {
-    exec: regexpExec
-  });
-
-  var SPECIES$3 = wellKnownSymbol('species');
-
-  var REPLACE_SUPPORTS_NAMED_GROUPS = !fails(function () {
-    // #replace needs built-in support for named groups.
-    // #match works fine because it just return the exec results, even if it has
-    // a "grops" property.
-    var re = /./;
-    re.exec = function () {
-      var result = [];
-      result.groups = { a: '7' };
-      return result;
-    };
-    return ''.replace(re, '$<a>') !== '7';
-  });
-
-  // Chrome 51 has a buggy "split" implementation when RegExp#exec !== nativeExec
-  // Weex JS has frozen built-in prototypes, so use try / catch wrapper
-  var SPLIT_WORKS_WITH_OVERWRITTEN_EXEC = !fails(function () {
-    var re = /(?:)/;
-    var originalExec = re.exec;
-    re.exec = function () { return originalExec.apply(this, arguments); };
-    var result = 'ab'.split(re);
-    return result.length !== 2 || result[0] !== 'a' || result[1] !== 'b';
-  });
-
-  var fixRegexpWellKnownSymbolLogic = function (KEY, length, exec, sham) {
-    var SYMBOL = wellKnownSymbol(KEY);
-
-    var DELEGATES_TO_SYMBOL = !fails(function () {
-      // String methods call symbol-named RegEp methods
-      var O = {};
-      O[SYMBOL] = function () { return 7; };
-      return ''[KEY](O) != 7;
-    });
-
-    var DELEGATES_TO_EXEC = DELEGATES_TO_SYMBOL && !fails(function () {
-      // Symbol-named RegExp methods call .exec
-      var execCalled = false;
-      var re = /a/;
-
-      if (KEY === 'split') {
-        // We can't use real regex here since it causes deoptimization
-        // and serious performance degradation in V8
-        // https://github.com/zloirock/core-js/issues/306
-        re = {};
-        // RegExp[@@split] doesn't call the regex's exec method, but first creates
-        // a new one. We need to return the patched regex when creating the new one.
-        re.constructor = {};
-        re.constructor[SPECIES$3] = function () { return re; };
-        re.flags = '';
-        re[SYMBOL] = /./[SYMBOL];
-      }
-
-      re.exec = function () { execCalled = true; return null; };
-
-      re[SYMBOL]('');
-      return !execCalled;
-    });
-
-    if (
-      !DELEGATES_TO_SYMBOL ||
-      !DELEGATES_TO_EXEC ||
-      (KEY === 'replace' && !REPLACE_SUPPORTS_NAMED_GROUPS) ||
-      (KEY === 'split' && !SPLIT_WORKS_WITH_OVERWRITTEN_EXEC)
-    ) {
-      var nativeRegExpMethod = /./[SYMBOL];
-      var methods = exec(SYMBOL, ''[KEY], function (nativeMethod, regexp, str, arg2, forceStringMethod) {
-        if (regexp.exec === regexpExec) {
-          if (DELEGATES_TO_SYMBOL && !forceStringMethod) {
-            // The native String method already delegates to @@method (this
-            // polyfilled function), leasing to infinite recursion.
-            // We avoid it by directly calling the native @@method method.
-            return { done: true, value: nativeRegExpMethod.call(regexp, str, arg2) };
-          }
-          return { done: true, value: nativeMethod.call(str, regexp, arg2) };
-        }
-        return { done: false };
-      });
-      var stringMethod = methods[0];
-      var regexMethod = methods[1];
-
-      redefine(String.prototype, KEY, stringMethod);
-      redefine(RegExp.prototype, SYMBOL, length == 2
-        // 21.2.5.8 RegExp.prototype[@@replace](string, replaceValue)
-        // 21.2.5.11 RegExp.prototype[@@split](string, limit)
-        ? function (string, arg) { return regexMethod.call(string, this, arg); }
-        // 21.2.5.6 RegExp.prototype[@@match](string)
-        // 21.2.5.9 RegExp.prototype[@@search](string)
-        : function (string) { return regexMethod.call(string, this); }
-      );
-      if (sham) createNonEnumerableProperty(RegExp.prototype[SYMBOL], 'sham', true);
-    }
-  };
-
-  // `String.prototype.{ codePointAt, at }` methods implementation
-  var createMethod$1 = function (CONVERT_TO_STRING) {
-    return function ($this, pos) {
-      var S = String(requireObjectCoercible($this));
-      var position = toInteger(pos);
-      var size = S.length;
-      var first, second;
-      if (position < 0 || position >= size) return CONVERT_TO_STRING ? '' : undefined;
-      first = S.charCodeAt(position);
-      return first < 0xD800 || first > 0xDBFF || position + 1 === size
-        || (second = S.charCodeAt(position + 1)) < 0xDC00 || second > 0xDFFF
-          ? CONVERT_TO_STRING ? S.charAt(position) : first
-          : CONVERT_TO_STRING ? S.slice(position, position + 2) : (first - 0xD800 << 10) + (second - 0xDC00) + 0x10000;
-    };
-  };
-
-  var stringMultibyte = {
-    // `String.prototype.codePointAt` method
-    // https://tc39.github.io/ecma262/#sec-string.prototype.codepointat
-    codeAt: createMethod$1(false),
-    // `String.prototype.at` method
-    // https://github.com/mathiasbynens/String.prototype.at
-    charAt: createMethod$1(true)
-  };
-
-  var charAt = stringMultibyte.charAt;
-
-  // `AdvanceStringIndex` abstract operation
-  // https://tc39.github.io/ecma262/#sec-advancestringindex
-  var advanceStringIndex = function (S, index, unicode) {
-    return index + (unicode ? charAt(S, index).length : 1);
-  };
-
-  // `RegExpExec` abstract operation
-  // https://tc39.github.io/ecma262/#sec-regexpexec
-  var regexpExecAbstract = function (R, S) {
-    var exec = R.exec;
-    if (typeof exec === 'function') {
-      var result = exec.call(R, S);
-      if (typeof result !== 'object') {
-        throw TypeError('RegExp exec method returned something other than an Object or null');
-      }
-      return result;
-    }
-
-    if (classofRaw(R) !== 'RegExp') {
-      throw TypeError('RegExp#exec called on incompatible receiver');
-    }
-
-    return regexpExec.call(R, S);
-  };
-
-  // @@match logic
-  fixRegexpWellKnownSymbolLogic('match', 1, function (MATCH, nativeMatch, maybeCallNative) {
-    return [
-      // `String.prototype.match` method
-      // https://tc39.github.io/ecma262/#sec-string.prototype.match
-      function match(regexp) {
-        var O = requireObjectCoercible(this);
-        var matcher = regexp == undefined ? undefined : regexp[MATCH];
-        return matcher !== undefined ? matcher.call(regexp, O) : new RegExp(regexp)[MATCH](String(O));
-      },
-      // `RegExp.prototype[@@match]` method
-      // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@match
-      function (regexp) {
-        var res = maybeCallNative(nativeMatch, regexp, this);
-        if (res.done) return res.value;
-
-        var rx = anObject(regexp);
-        var S = String(this);
-
-        if (!rx.global) return regexpExecAbstract(rx, S);
-
-        var fullUnicode = rx.unicode;
-        rx.lastIndex = 0;
-        var A = [];
-        var n = 0;
-        var result;
-        while ((result = regexpExecAbstract(rx, S)) !== null) {
-          var matchStr = String(result[0]);
-          A[n] = matchStr;
-          if (matchStr === '') rx.lastIndex = advanceStringIndex(S, toLength(rx.lastIndex), fullUnicode);
-          n++;
-        }
-        return n === 0 ? null : A;
-      }
-    ];
-  });
-
-  // `ToObject` abstract operation
-  // https://tc39.github.io/ecma262/#sec-toobject
-  var toObject = function (argument) {
-    return Object(requireObjectCoercible(argument));
-  };
-
-  var max$1 = Math.max;
-  var min$2 = Math.min;
-  var floor$1 = Math.floor;
-  var SUBSTITUTION_SYMBOLS = /\$([$&'`]|\d\d?|<[^>]*>)/g;
-  var SUBSTITUTION_SYMBOLS_NO_NAMED = /\$([$&'`]|\d\d?)/g;
-
-  var maybeToString = function (it) {
-    return it === undefined ? it : String(it);
-  };
-
-  // @@replace logic
-  fixRegexpWellKnownSymbolLogic('replace', 2, function (REPLACE, nativeReplace, maybeCallNative) {
-    return [
-      // `String.prototype.replace` method
-      // https://tc39.github.io/ecma262/#sec-string.prototype.replace
-      function replace(searchValue, replaceValue) {
-        var O = requireObjectCoercible(this);
-        var replacer = searchValue == undefined ? undefined : searchValue[REPLACE];
-        return replacer !== undefined
-          ? replacer.call(searchValue, O, replaceValue)
-          : nativeReplace.call(String(O), searchValue, replaceValue);
-      },
-      // `RegExp.prototype[@@replace]` method
-      // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@replace
-      function (regexp, replaceValue) {
-        var res = maybeCallNative(nativeReplace, regexp, this, replaceValue);
-        if (res.done) return res.value;
-
-        var rx = anObject(regexp);
-        var S = String(this);
-
-        var functionalReplace = typeof replaceValue === 'function';
-        if (!functionalReplace) replaceValue = String(replaceValue);
-
-        var global = rx.global;
-        if (global) {
-          var fullUnicode = rx.unicode;
-          rx.lastIndex = 0;
-        }
-        var results = [];
-        while (true) {
-          var result = regexpExecAbstract(rx, S);
-          if (result === null) break;
-
-          results.push(result);
-          if (!global) break;
-
-          var matchStr = String(result[0]);
-          if (matchStr === '') rx.lastIndex = advanceStringIndex(S, toLength(rx.lastIndex), fullUnicode);
-        }
-
-        var accumulatedResult = '';
-        var nextSourcePosition = 0;
-        for (var i = 0; i < results.length; i++) {
-          result = results[i];
-
-          var matched = String(result[0]);
-          var position = max$1(min$2(toInteger(result.index), S.length), 0);
-          var captures = [];
-          // NOTE: This is equivalent to
-          //   captures = result.slice(1).map(maybeToString)
-          // but for some reason `nativeSlice.call(result, 1, result.length)` (called in
-          // the slice polyfill when slicing native arrays) "doesn't work" in safari 9 and
-          // causes a crash (https://pastebin.com/N21QzeQA) when trying to debug it.
-          for (var j = 1; j < result.length; j++) captures.push(maybeToString(result[j]));
-          var namedCaptures = result.groups;
-          if (functionalReplace) {
-            var replacerArgs = [matched].concat(captures, position, S);
-            if (namedCaptures !== undefined) replacerArgs.push(namedCaptures);
-            var replacement = String(replaceValue.apply(undefined, replacerArgs));
-          } else {
-            replacement = getSubstitution(matched, S, position, captures, namedCaptures, replaceValue);
-          }
-          if (position >= nextSourcePosition) {
-            accumulatedResult += S.slice(nextSourcePosition, position) + replacement;
-            nextSourcePosition = position + matched.length;
-          }
-        }
-        return accumulatedResult + S.slice(nextSourcePosition);
-      }
-    ];
-
-    // https://tc39.github.io/ecma262/#sec-getsubstitution
-    function getSubstitution(matched, str, position, captures, namedCaptures, replacement) {
-      var tailPos = position + matched.length;
-      var m = captures.length;
-      var symbols = SUBSTITUTION_SYMBOLS_NO_NAMED;
-      if (namedCaptures !== undefined) {
-        namedCaptures = toObject(namedCaptures);
-        symbols = SUBSTITUTION_SYMBOLS;
-      }
-      return nativeReplace.call(replacement, symbols, function (match, ch) {
-        var capture;
-        switch (ch.charAt(0)) {
-          case '$': return '$';
-          case '&': return matched;
-          case '`': return str.slice(0, position);
-          case "'": return str.slice(tailPos);
-          case '<':
-            capture = namedCaptures[ch.slice(1, -1)];
-            break;
-          default: // \d\d?
-            var n = +ch;
-            if (n === 0) return match;
-            if (n > m) {
-              var f = floor$1(n / 10);
-              if (f === 0) return match;
-              if (f <= m) return captures[f - 1] === undefined ? ch.charAt(1) : captures[f - 1] + ch.charAt(1);
-              return match;
-            }
-            capture = captures[n - 1];
-        }
-        return capture === undefined ? '' : capture;
-      });
-    }
-  });
-
   function _typeof(obj) {
     if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
       _typeof = function (obj) {
@@ -1854,6 +1478,21 @@ var app = (function () {
     if (protoProps) _defineProperties(Constructor.prototype, protoProps);
     if (staticProps) _defineProperties(Constructor, staticProps);
     return Constructor;
+  }
+
+  function _defineProperty(obj, key, value) {
+    if (key in obj) {
+      Object.defineProperty(obj, key, {
+        value: value,
+        enumerable: true,
+        configurable: true,
+        writable: true
+      });
+    } else {
+      obj[key] = value;
+    }
+
+    return obj;
   }
 
   function _inherits(subClass, superClass) {
@@ -2001,6 +1640,10 @@ var app = (function () {
     return _get(target, property, receiver || target);
   }
 
+  function _slicedToArray(arr, i) {
+    return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
+  }
+
   function _toConsumableArray(arr) {
     return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
   }
@@ -2013,12 +1656,50 @@ var app = (function () {
     }
   }
 
+  function _arrayWithHoles(arr) {
+    if (Array.isArray(arr)) return arr;
+  }
+
   function _iterableToArray(iter) {
     if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
   }
 
+  function _iterableToArrayLimit(arr, i) {
+    if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === "[object Arguments]")) {
+      return;
+    }
+
+    var _arr = [];
+    var _n = true;
+    var _d = false;
+    var _e = undefined;
+
+    try {
+      for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) {
+        _arr.push(_s.value);
+
+        if (i && _arr.length === i) break;
+      }
+    } catch (err) {
+      _d = true;
+      _e = err;
+    } finally {
+      try {
+        if (!_n && _i["return"] != null) _i["return"]();
+      } finally {
+        if (_d) throw _e;
+      }
+    }
+
+    return _arr;
+  }
+
   function _nonIterableSpread() {
     throw new TypeError("Invalid attempt to spread non-iterable instance");
+  }
+
+  function _nonIterableRest() {
+    throw new TypeError("Invalid attempt to destructure non-iterable instance");
   }
 
   var runtime_1 = createCommonjsModule(function (module) {
@@ -2755,13 +2436,19 @@ var app = (function () {
     return classofRaw(arg) == 'Array';
   };
 
+  // `ToObject` abstract operation
+  // https://tc39.github.io/ecma262/#sec-toobject
+  var toObject = function (argument) {
+    return Object(requireObjectCoercible(argument));
+  };
+
   var createProperty = function (object, key, value) {
     var propertyKey = toPrimitive(key);
     if (propertyKey in object) objectDefineProperty.f(object, propertyKey, createPropertyDescriptor(0, value));
     else object[propertyKey] = value;
   };
 
-  var SPECIES$4 = wellKnownSymbol('species');
+  var SPECIES$3 = wellKnownSymbol('species');
 
   // `ArraySpeciesCreate` abstract operation
   // https://tc39.github.io/ecma262/#sec-arrayspeciescreate
@@ -2772,13 +2459,13 @@ var app = (function () {
       // cross-realm fallback
       if (typeof C == 'function' && (C === Array || isArray(C.prototype))) C = undefined;
       else if (isObject(C)) {
-        C = C[SPECIES$4];
+        C = C[SPECIES$3];
         if (C === null) C = undefined;
       }
     } return new (C === undefined ? Array : C)(length === 0 ? 0 : length);
   };
 
-  var SPECIES$5 = wellKnownSymbol('species');
+  var SPECIES$4 = wellKnownSymbol('species');
 
   var arrayMethodHasSpeciesSupport = function (METHOD_NAME) {
     // We can't use this feature detection in V8 since it causes
@@ -2787,7 +2474,7 @@ var app = (function () {
     return v8Version >= 51 || !fails(function () {
       var array = [];
       var constructor = array.constructor = {};
-      constructor[SPECIES$5] = function () {
+      constructor[SPECIES$4] = function () {
         return { foo: 1 };
       };
       return array[METHOD_NAME](Boolean).foo !== 1;
@@ -2845,7 +2532,7 @@ var app = (function () {
   var push = [].push;
 
   // `Array.prototype.{ forEach, map, filter, some, every, find, findIndex }` methods implementation
-  var createMethod$2 = function (TYPE) {
+  var createMethod$1 = function (TYPE) {
     var IS_MAP = TYPE == 1;
     var IS_FILTER = TYPE == 2;
     var IS_SOME = TYPE == 3;
@@ -2881,25 +2568,25 @@ var app = (function () {
   var arrayIteration = {
     // `Array.prototype.forEach` method
     // https://tc39.github.io/ecma262/#sec-array.prototype.foreach
-    forEach: createMethod$2(0),
+    forEach: createMethod$1(0),
     // `Array.prototype.map` method
     // https://tc39.github.io/ecma262/#sec-array.prototype.map
-    map: createMethod$2(1),
+    map: createMethod$1(1),
     // `Array.prototype.filter` method
     // https://tc39.github.io/ecma262/#sec-array.prototype.filter
-    filter: createMethod$2(2),
+    filter: createMethod$1(2),
     // `Array.prototype.some` method
     // https://tc39.github.io/ecma262/#sec-array.prototype.some
-    some: createMethod$2(3),
+    some: createMethod$1(3),
     // `Array.prototype.every` method
     // https://tc39.github.io/ecma262/#sec-array.prototype.every
-    every: createMethod$2(4),
+    every: createMethod$1(4),
     // `Array.prototype.find` method
     // https://tc39.github.io/ecma262/#sec-array.prototype.find
-    find: createMethod$2(5),
+    find: createMethod$1(5),
     // `Array.prototype.findIndex` method
     // https://tc39.github.io/ecma262/#sec-array.prototype.findIndex
-    findIndex: createMethod$2(6)
+    findIndex: createMethod$1(6)
   };
 
   var $filter = arrayIteration.filter;
@@ -3318,9 +3005,9 @@ var app = (function () {
     }
   });
 
-  var SPECIES$6 = wellKnownSymbol('species');
+  var SPECIES$5 = wellKnownSymbol('species');
   var nativeSlice = [].slice;
-  var max$2 = Math.max;
+  var max$1 = Math.max;
 
   // `Array.prototype.slice` method
   // https://tc39.github.io/ecma262/#sec-array.prototype.slice
@@ -3339,22 +3026,22 @@ var app = (function () {
         if (typeof Constructor == 'function' && (Constructor === Array || isArray(Constructor.prototype))) {
           Constructor = undefined;
         } else if (isObject(Constructor)) {
-          Constructor = Constructor[SPECIES$6];
+          Constructor = Constructor[SPECIES$5];
           if (Constructor === null) Constructor = undefined;
         }
         if (Constructor === Array || Constructor === undefined) {
           return nativeSlice.call(O, k, fin);
         }
       }
-      result = new (Constructor === undefined ? Array : Constructor)(max$2(fin - k, 0));
+      result = new (Constructor === undefined ? Array : Constructor)(max$1(fin - k, 0));
       for (n = 0; k < fin; k++, n++) if (k in O) createProperty(result, n, O[k]);
       result.length = n;
       return result;
     }
   });
 
-  var max$3 = Math.max;
-  var min$3 = Math.min;
+  var max$2 = Math.max;
+  var min$2 = Math.min;
   var MAX_SAFE_INTEGER$1 = 0x1FFFFFFFFFFFFF;
   var MAXIMUM_ALLOWED_LENGTH_EXCEEDED = 'Maximum allowed length exceeded';
 
@@ -3375,7 +3062,7 @@ var app = (function () {
         actualDeleteCount = len - actualStart;
       } else {
         insertCount = argumentsLength - 2;
-        actualDeleteCount = min$3(max$3(toInteger(deleteCount), 0), len - actualStart);
+        actualDeleteCount = min$2(max$2(toInteger(deleteCount), 0), len - actualStart);
       }
       if (len + insertCount - actualDeleteCount > MAX_SAFE_INTEGER$1) {
         throw TypeError(MAXIMUM_ALLOWED_LENGTH_EXCEEDED);
@@ -3839,13 +3526,108 @@ var app = (function () {
     }
   });
 
+  // `RegExp.prototype.flags` getter implementation
+  // https://tc39.github.io/ecma262/#sec-get-regexp.prototype.flags
+  var regexpFlags = function () {
+    var that = anObject(this);
+    var result = '';
+    if (that.global) result += 'g';
+    if (that.ignoreCase) result += 'i';
+    if (that.multiline) result += 'm';
+    if (that.dotAll) result += 's';
+    if (that.unicode) result += 'u';
+    if (that.sticky) result += 'y';
+    return result;
+  };
+
+  var nativeExec = RegExp.prototype.exec;
+  // This always refers to the native implementation, because the
+  // String#replace polyfill uses ./fix-regexp-well-known-symbol-logic.js,
+  // which loads this file before patching the method.
+  var nativeReplace = String.prototype.replace;
+
+  var patchedExec = nativeExec;
+
+  var UPDATES_LAST_INDEX_WRONG = (function () {
+    var re1 = /a/;
+    var re2 = /b*/g;
+    nativeExec.call(re1, 'a');
+    nativeExec.call(re2, 'a');
+    return re1.lastIndex !== 0 || re2.lastIndex !== 0;
+  })();
+
+  // nonparticipating capturing group, copied from es5-shim's String#split patch.
+  var NPCG_INCLUDED = /()??/.exec('')[1] !== undefined;
+
+  var PATCH = UPDATES_LAST_INDEX_WRONG || NPCG_INCLUDED;
+
+  if (PATCH) {
+    patchedExec = function exec(str) {
+      var re = this;
+      var lastIndex, reCopy, match, i;
+
+      if (NPCG_INCLUDED) {
+        reCopy = new RegExp('^' + re.source + '$(?!\\s)', regexpFlags.call(re));
+      }
+      if (UPDATES_LAST_INDEX_WRONG) lastIndex = re.lastIndex;
+
+      match = nativeExec.call(re, str);
+
+      if (UPDATES_LAST_INDEX_WRONG && match) {
+        re.lastIndex = re.global ? match.index + match[0].length : lastIndex;
+      }
+      if (NPCG_INCLUDED && match && match.length > 1) {
+        // Fix browsers whose `exec` methods don't consistently return `undefined`
+        // for NPCG, like IE8. NOTE: This doesn' work for /(.?)?/
+        nativeReplace.call(match[0], reCopy, function () {
+          for (i = 1; i < arguments.length - 2; i++) {
+            if (arguments[i] === undefined) match[i] = undefined;
+          }
+        });
+      }
+
+      return match;
+    };
+  }
+
+  var regexpExec = patchedExec;
+
+  _export({ target: 'RegExp', proto: true, forced: /./.exec !== regexpExec }, {
+    exec: regexpExec
+  });
+
   // `Set` constructor
   // https://tc39.github.io/ecma262/#sec-set-objects
   var es_set = collection('Set', function (init) {
     return function Set() { return init(this, arguments.length ? arguments[0] : undefined); };
   }, collectionStrong);
 
-  var charAt$1 = stringMultibyte.charAt;
+  // `String.prototype.{ codePointAt, at }` methods implementation
+  var createMethod$2 = function (CONVERT_TO_STRING) {
+    return function ($this, pos) {
+      var S = String(requireObjectCoercible($this));
+      var position = toInteger(pos);
+      var size = S.length;
+      var first, second;
+      if (position < 0 || position >= size) return CONVERT_TO_STRING ? '' : undefined;
+      first = S.charCodeAt(position);
+      return first < 0xD800 || first > 0xDBFF || position + 1 === size
+        || (second = S.charCodeAt(position + 1)) < 0xDC00 || second > 0xDFFF
+          ? CONVERT_TO_STRING ? S.charAt(position) : first
+          : CONVERT_TO_STRING ? S.slice(position, position + 2) : (first - 0xD800 << 10) + (second - 0xDC00) + 0x10000;
+    };
+  };
+
+  var stringMultibyte = {
+    // `String.prototype.codePointAt` method
+    // https://tc39.github.io/ecma262/#sec-string.prototype.codepointat
+    codeAt: createMethod$2(false),
+    // `String.prototype.at` method
+    // https://github.com/mathiasbynens/String.prototype.at
+    charAt: createMethod$2(true)
+  };
+
+  var charAt = stringMultibyte.charAt;
 
 
 
@@ -3869,9 +3651,247 @@ var app = (function () {
     var index = state.index;
     var point;
     if (index >= string.length) return { value: undefined, done: true };
-    point = charAt$1(string, index);
+    point = charAt(string, index);
     state.index += point.length;
     return { value: point, done: false };
+  });
+
+  var SPECIES$6 = wellKnownSymbol('species');
+
+  var REPLACE_SUPPORTS_NAMED_GROUPS = !fails(function () {
+    // #replace needs built-in support for named groups.
+    // #match works fine because it just return the exec results, even if it has
+    // a "grops" property.
+    var re = /./;
+    re.exec = function () {
+      var result = [];
+      result.groups = { a: '7' };
+      return result;
+    };
+    return ''.replace(re, '$<a>') !== '7';
+  });
+
+  // Chrome 51 has a buggy "split" implementation when RegExp#exec !== nativeExec
+  // Weex JS has frozen built-in prototypes, so use try / catch wrapper
+  var SPLIT_WORKS_WITH_OVERWRITTEN_EXEC = !fails(function () {
+    var re = /(?:)/;
+    var originalExec = re.exec;
+    re.exec = function () { return originalExec.apply(this, arguments); };
+    var result = 'ab'.split(re);
+    return result.length !== 2 || result[0] !== 'a' || result[1] !== 'b';
+  });
+
+  var fixRegexpWellKnownSymbolLogic = function (KEY, length, exec, sham) {
+    var SYMBOL = wellKnownSymbol(KEY);
+
+    var DELEGATES_TO_SYMBOL = !fails(function () {
+      // String methods call symbol-named RegEp methods
+      var O = {};
+      O[SYMBOL] = function () { return 7; };
+      return ''[KEY](O) != 7;
+    });
+
+    var DELEGATES_TO_EXEC = DELEGATES_TO_SYMBOL && !fails(function () {
+      // Symbol-named RegExp methods call .exec
+      var execCalled = false;
+      var re = /a/;
+
+      if (KEY === 'split') {
+        // We can't use real regex here since it causes deoptimization
+        // and serious performance degradation in V8
+        // https://github.com/zloirock/core-js/issues/306
+        re = {};
+        // RegExp[@@split] doesn't call the regex's exec method, but first creates
+        // a new one. We need to return the patched regex when creating the new one.
+        re.constructor = {};
+        re.constructor[SPECIES$6] = function () { return re; };
+        re.flags = '';
+        re[SYMBOL] = /./[SYMBOL];
+      }
+
+      re.exec = function () { execCalled = true; return null; };
+
+      re[SYMBOL]('');
+      return !execCalled;
+    });
+
+    if (
+      !DELEGATES_TO_SYMBOL ||
+      !DELEGATES_TO_EXEC ||
+      (KEY === 'replace' && !REPLACE_SUPPORTS_NAMED_GROUPS) ||
+      (KEY === 'split' && !SPLIT_WORKS_WITH_OVERWRITTEN_EXEC)
+    ) {
+      var nativeRegExpMethod = /./[SYMBOL];
+      var methods = exec(SYMBOL, ''[KEY], function (nativeMethod, regexp, str, arg2, forceStringMethod) {
+        if (regexp.exec === regexpExec) {
+          if (DELEGATES_TO_SYMBOL && !forceStringMethod) {
+            // The native String method already delegates to @@method (this
+            // polyfilled function), leasing to infinite recursion.
+            // We avoid it by directly calling the native @@method method.
+            return { done: true, value: nativeRegExpMethod.call(regexp, str, arg2) };
+          }
+          return { done: true, value: nativeMethod.call(str, regexp, arg2) };
+        }
+        return { done: false };
+      });
+      var stringMethod = methods[0];
+      var regexMethod = methods[1];
+
+      redefine(String.prototype, KEY, stringMethod);
+      redefine(RegExp.prototype, SYMBOL, length == 2
+        // 21.2.5.8 RegExp.prototype[@@replace](string, replaceValue)
+        // 21.2.5.11 RegExp.prototype[@@split](string, limit)
+        ? function (string, arg) { return regexMethod.call(string, this, arg); }
+        // 21.2.5.6 RegExp.prototype[@@match](string)
+        // 21.2.5.9 RegExp.prototype[@@search](string)
+        : function (string) { return regexMethod.call(string, this); }
+      );
+      if (sham) createNonEnumerableProperty(RegExp.prototype[SYMBOL], 'sham', true);
+    }
+  };
+
+  var charAt$1 = stringMultibyte.charAt;
+
+  // `AdvanceStringIndex` abstract operation
+  // https://tc39.github.io/ecma262/#sec-advancestringindex
+  var advanceStringIndex = function (S, index, unicode) {
+    return index + (unicode ? charAt$1(S, index).length : 1);
+  };
+
+  // `RegExpExec` abstract operation
+  // https://tc39.github.io/ecma262/#sec-regexpexec
+  var regexpExecAbstract = function (R, S) {
+    var exec = R.exec;
+    if (typeof exec === 'function') {
+      var result = exec.call(R, S);
+      if (typeof result !== 'object') {
+        throw TypeError('RegExp exec method returned something other than an Object or null');
+      }
+      return result;
+    }
+
+    if (classofRaw(R) !== 'RegExp') {
+      throw TypeError('RegExp#exec called on incompatible receiver');
+    }
+
+    return regexpExec.call(R, S);
+  };
+
+  var max$3 = Math.max;
+  var min$3 = Math.min;
+  var floor$1 = Math.floor;
+  var SUBSTITUTION_SYMBOLS = /\$([$&'`]|\d\d?|<[^>]*>)/g;
+  var SUBSTITUTION_SYMBOLS_NO_NAMED = /\$([$&'`]|\d\d?)/g;
+
+  var maybeToString = function (it) {
+    return it === undefined ? it : String(it);
+  };
+
+  // @@replace logic
+  fixRegexpWellKnownSymbolLogic('replace', 2, function (REPLACE, nativeReplace, maybeCallNative) {
+    return [
+      // `String.prototype.replace` method
+      // https://tc39.github.io/ecma262/#sec-string.prototype.replace
+      function replace(searchValue, replaceValue) {
+        var O = requireObjectCoercible(this);
+        var replacer = searchValue == undefined ? undefined : searchValue[REPLACE];
+        return replacer !== undefined
+          ? replacer.call(searchValue, O, replaceValue)
+          : nativeReplace.call(String(O), searchValue, replaceValue);
+      },
+      // `RegExp.prototype[@@replace]` method
+      // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@replace
+      function (regexp, replaceValue) {
+        var res = maybeCallNative(nativeReplace, regexp, this, replaceValue);
+        if (res.done) return res.value;
+
+        var rx = anObject(regexp);
+        var S = String(this);
+
+        var functionalReplace = typeof replaceValue === 'function';
+        if (!functionalReplace) replaceValue = String(replaceValue);
+
+        var global = rx.global;
+        if (global) {
+          var fullUnicode = rx.unicode;
+          rx.lastIndex = 0;
+        }
+        var results = [];
+        while (true) {
+          var result = regexpExecAbstract(rx, S);
+          if (result === null) break;
+
+          results.push(result);
+          if (!global) break;
+
+          var matchStr = String(result[0]);
+          if (matchStr === '') rx.lastIndex = advanceStringIndex(S, toLength(rx.lastIndex), fullUnicode);
+        }
+
+        var accumulatedResult = '';
+        var nextSourcePosition = 0;
+        for (var i = 0; i < results.length; i++) {
+          result = results[i];
+
+          var matched = String(result[0]);
+          var position = max$3(min$3(toInteger(result.index), S.length), 0);
+          var captures = [];
+          // NOTE: This is equivalent to
+          //   captures = result.slice(1).map(maybeToString)
+          // but for some reason `nativeSlice.call(result, 1, result.length)` (called in
+          // the slice polyfill when slicing native arrays) "doesn't work" in safari 9 and
+          // causes a crash (https://pastebin.com/N21QzeQA) when trying to debug it.
+          for (var j = 1; j < result.length; j++) captures.push(maybeToString(result[j]));
+          var namedCaptures = result.groups;
+          if (functionalReplace) {
+            var replacerArgs = [matched].concat(captures, position, S);
+            if (namedCaptures !== undefined) replacerArgs.push(namedCaptures);
+            var replacement = String(replaceValue.apply(undefined, replacerArgs));
+          } else {
+            replacement = getSubstitution(matched, S, position, captures, namedCaptures, replaceValue);
+          }
+          if (position >= nextSourcePosition) {
+            accumulatedResult += S.slice(nextSourcePosition, position) + replacement;
+            nextSourcePosition = position + matched.length;
+          }
+        }
+        return accumulatedResult + S.slice(nextSourcePosition);
+      }
+    ];
+
+    // https://tc39.github.io/ecma262/#sec-getsubstitution
+    function getSubstitution(matched, str, position, captures, namedCaptures, replacement) {
+      var tailPos = position + matched.length;
+      var m = captures.length;
+      var symbols = SUBSTITUTION_SYMBOLS_NO_NAMED;
+      if (namedCaptures !== undefined) {
+        namedCaptures = toObject(namedCaptures);
+        symbols = SUBSTITUTION_SYMBOLS;
+      }
+      return nativeReplace.call(replacement, symbols, function (match, ch) {
+        var capture;
+        switch (ch.charAt(0)) {
+          case '$': return '$';
+          case '&': return matched;
+          case '`': return str.slice(0, position);
+          case "'": return str.slice(tailPos);
+          case '<':
+            capture = namedCaptures[ch.slice(1, -1)];
+            break;
+          default: // \d\d?
+            var n = +ch;
+            if (n === 0) return match;
+            if (n > m) {
+              var f = floor$1(n / 10);
+              if (f === 0) return match;
+              if (f <= m) return captures[f - 1] === undefined ? ch.charAt(1) : captures[f - 1] + ch.charAt(1);
+              return match;
+            }
+            capture = captures[n - 1];
+        }
+        return capture === undefined ? '' : capture;
+      });
+    }
   });
 
   var MATCH = wellKnownSymbol('match');
@@ -4111,6 +4131,19 @@ var app = (function () {
 
   function noop() {}
 
+  function assign(tar, src) {
+    // @ts-ignore
+    for (var k in src) {
+      tar[k] = src[k];
+    }
+
+    return tar;
+  }
+
+  function is_promise(value) {
+    return value && _typeof(value) === 'object' && typeof value.then === 'function';
+  }
+
   function add_location(element, file, line, column, char) {
     element.__svelte_meta = {
       loc: {
@@ -4168,6 +4201,10 @@ var app = (function () {
 
   function space() {
     return text(' ');
+  }
+
+  function empty() {
+    return text('');
   }
 
   function listen(node, event, handler, options) {
@@ -4329,6 +4366,72 @@ var app = (function () {
         }
       });
       block.o(local);
+    }
+  }
+
+  function handle_promise(promise, info) {
+    var token = info.token = {};
+
+    function update(type, index, key, value) {
+      if (info.token !== token) return;
+      info.resolved = key && _defineProperty({}, key, value);
+      var child_ctx = assign(assign({}, info.ctx), info.resolved);
+      var block = type && (info.current = type)(child_ctx);
+      var needs_flush = false;
+
+      if (info.block) {
+        if (info.blocks) {
+          info.blocks.forEach(function (block, i) {
+            if (i !== index && block) {
+              group_outros();
+              transition_out(block, 1, 1, function () {
+                info.blocks[i] = null;
+              });
+              check_outros();
+            }
+          });
+        } else {
+          info.block.d(1);
+        }
+
+        block.c();
+        transition_in(block, 1);
+        block.m(info.mount(), info.anchor);
+        needs_flush = true;
+      }
+
+      info.block = block;
+      if (info.blocks) info.blocks[index] = block;
+
+      if (needs_flush) {
+        flush$1();
+      }
+    }
+
+    if (is_promise(promise)) {
+      var _current_component = get_current_component();
+
+      promise.then(function (value) {
+        set_current_component(_current_component);
+        update(info.then, 1, info.value, value);
+        set_current_component(null);
+      }, function (error) {
+        set_current_component(_current_component);
+        update(info.catch, 2, info.error, error);
+        set_current_component(null);
+      }); // if we previously had a then/catch block, destroy it
+
+      if (info.current !== info.pending) {
+        update(info.pending, 0);
+        return true;
+      }
+    } else {
+      if (info.current !== info.then) {
+        update(info.then, 1, info.value, promise);
+        return true;
+      }
+
+      info.resolved = _defineProperty({}, info.value, promise);
     }
   }
 
@@ -4723,6 +4826,43 @@ var app = (function () {
 
     return SvelteComponentDev;
   }(SvelteComponent);
+
+  // @@match logic
+  fixRegexpWellKnownSymbolLogic('match', 1, function (MATCH, nativeMatch, maybeCallNative) {
+    return [
+      // `String.prototype.match` method
+      // https://tc39.github.io/ecma262/#sec-string.prototype.match
+      function match(regexp) {
+        var O = requireObjectCoercible(this);
+        var matcher = regexp == undefined ? undefined : regexp[MATCH];
+        return matcher !== undefined ? matcher.call(regexp, O) : new RegExp(regexp)[MATCH](String(O));
+      },
+      // `RegExp.prototype[@@match]` method
+      // https://tc39.github.io/ecma262/#sec-regexp.prototype-@@match
+      function (regexp) {
+        var res = maybeCallNative(nativeMatch, regexp, this);
+        if (res.done) return res.value;
+
+        var rx = anObject(regexp);
+        var S = String(this);
+
+        if (!rx.global) return regexpExecAbstract(rx, S);
+
+        var fullUnicode = rx.unicode;
+        rx.lastIndex = 0;
+        var A = [];
+        var n = 0;
+        var result;
+        while ((result = regexpExecAbstract(rx, S)) !== null) {
+          var matchStr = String(result[0]);
+          A[n] = matchStr;
+          if (matchStr === '') rx.lastIndex = advanceStringIndex(S, toLength(rx.lastIndex), fullUnicode);
+          n++;
+        }
+        return n === 0 ? null : A;
+      }
+    ];
+  });
 
   /*! *****************************************************************************
   Copyright (c) Microsoft Corporation. All rights reserved.
@@ -6564,7 +6704,7 @@ var app = (function () {
   exports.validateCallback = validateCallback;
   exports.validateContextObject = validateContextObject;
   exports.validateNamespace = validateNamespace;
-  //# sourceMappingURL=index.cjs.js.map
+
   });
 
   unwrapExports(index_cjs);
@@ -6826,7 +6966,6 @@ var app = (function () {
           inst.logLevel = level;
       });
   }
-  //# sourceMappingURL=index.esm.js.map
 
   var index_esm = /*#__PURE__*/Object.freeze({
     __proto__: null,
@@ -7409,15 +7548,15 @@ var app = (function () {
 
   exports.default = firebase;
   exports.firebase = firebase;
-  //# sourceMappingURL=index.cjs.js.map
+
   });
 
-  unwrapExports(index_cjs$1);
+  var firebase = unwrapExports(index_cjs$1);
   var index_cjs_1$1 = index_cjs$1.firebase;
 
   function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-  var firebase = _interopDefault(index_cjs$1);
+  var firebase$1 = _interopDefault(index_cjs$1);
 
   /**
    * @license
@@ -7436,7 +7575,7 @@ var app = (function () {
    * limitations under the License.
    */
 
-  var index_cjs$2 = firebase;
+  var index_cjs$2 = firebase$1;
 
   var commonjsGlobal$1 = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -7527,7 +7666,6 @@ var app = (function () {
   */
   Qd.prototype.createWebChannel=Qd.prototype.a;Y.prototype.send=Y.prototype.Xa;Y.prototype.open=Y.prototype.Wa;Y.prototype.close=Y.prototype.close;Pb.NO_ERROR=0;Pb.TIMEOUT=8;Pb.HTTP_ERROR=6;Qb.COMPLETE="complete";Tb.EventType=L;L.OPEN="a";L.CLOSE="b";L.ERROR="c";L.MESSAGE="d";G.prototype.listen=G.prototype.Aa;X.prototype.listenOnce=X.prototype.Ba;X.prototype.getLastError=X.prototype.Ya;X.prototype.getLastErrorCode=X.prototype.ya;X.prototype.getStatus=X.prototype.T;X.prototype.getStatusText=X.prototype.za;
   X.prototype.getResponseJson=X.prototype.Va;X.prototype.getResponseText=X.prototype.aa;X.prototype.send=X.prototype.ca;var tmp={createWebChannelTransport:Td,ErrorCode:Pb,EventType:Qb,WebChannel:Tb,XhrIo:X};
-  //# sourceMappingURL=index.esm.js.map
 
   var index_cjs$3 = createCommonjsModule(function (module, exports) {
 
@@ -30903,11 +31041,3566 @@ var app = (function () {
   registerFirestore(firebase);
 
   exports.registerFirestore = registerFirestore;
-  //# sourceMappingURL=index.cjs.js.map
+
   });
 
   unwrapExports(index_cjs$3);
   var index_cjs_1$2 = index_cjs$3.registerFirestore;
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @fileoverview Constants used in the Firebase Storage library.
+   */
+  /**
+   * Domain name for firebase storage.
+   */
+  var DEFAULT_HOST = 'firebasestorage.googleapis.com';
+  /**
+   * The key in Firebase config json for the storage bucket.
+   */
+  var CONFIG_STORAGE_BUCKET_KEY = 'storageBucket';
+  /**
+   * 2 minutes
+   *
+   * The timeout for all operations except upload.
+   */
+  var DEFAULT_MAX_OPERATION_RETRY_TIME = 2 * 60 * 1000;
+  /**
+   * 10 minutes
+   *
+   * The timeout for upload.
+   */
+  var DEFAULT_MAX_UPLOAD_RETRY_TIME = 10 * 60 * 1000;
+  /**
+   * This is the value of Number.MIN_SAFE_INTEGER, which is not well supported
+   * enough for us to use it directly.
+   */
+  var MIN_SAFE_INTEGER = -9007199254740991;
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  var FirebaseStorageError = /** @class */ (function () {
+      function FirebaseStorageError(code, message) {
+          this.code_ = prependCode(code);
+          this.message_ = 'Firebase Storage: ' + message;
+          this.serverResponse_ = null;
+          this.name_ = 'FirebaseError';
+      }
+      FirebaseStorageError.prototype.codeProp = function () {
+          return this.code;
+      };
+      FirebaseStorageError.prototype.codeEquals = function (code) {
+          return prependCode(code) === this.codeProp();
+      };
+      FirebaseStorageError.prototype.serverResponseProp = function () {
+          return this.serverResponse_;
+      };
+      FirebaseStorageError.prototype.setServerResponseProp = function (serverResponse) {
+          this.serverResponse_ = serverResponse;
+      };
+      Object.defineProperty(FirebaseStorageError.prototype, "name", {
+          get: function () {
+              return this.name_;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(FirebaseStorageError.prototype, "code", {
+          get: function () {
+              return this.code_;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(FirebaseStorageError.prototype, "message", {
+          get: function () {
+              return this.message_;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(FirebaseStorageError.prototype, "serverResponse", {
+          get: function () {
+              return this.serverResponse_;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      return FirebaseStorageError;
+  }());
+  var Code = {
+      // Shared between all platforms
+      UNKNOWN: 'unknown',
+      OBJECT_NOT_FOUND: 'object-not-found',
+      BUCKET_NOT_FOUND: 'bucket-not-found',
+      PROJECT_NOT_FOUND: 'project-not-found',
+      QUOTA_EXCEEDED: 'quota-exceeded',
+      UNAUTHENTICATED: 'unauthenticated',
+      UNAUTHORIZED: 'unauthorized',
+      RETRY_LIMIT_EXCEEDED: 'retry-limit-exceeded',
+      INVALID_CHECKSUM: 'invalid-checksum',
+      CANCELED: 'canceled',
+      // JS specific
+      INVALID_EVENT_NAME: 'invalid-event-name',
+      INVALID_URL: 'invalid-url',
+      INVALID_DEFAULT_BUCKET: 'invalid-default-bucket',
+      NO_DEFAULT_BUCKET: 'no-default-bucket',
+      CANNOT_SLICE_BLOB: 'cannot-slice-blob',
+      SERVER_FILE_WRONG_SIZE: 'server-file-wrong-size',
+      NO_DOWNLOAD_URL: 'no-download-url',
+      INVALID_ARGUMENT: 'invalid-argument',
+      INVALID_ARGUMENT_COUNT: 'invalid-argument-count',
+      APP_DELETED: 'app-deleted',
+      INVALID_ROOT_OPERATION: 'invalid-root-operation',
+      INVALID_FORMAT: 'invalid-format',
+      INTERNAL_ERROR: 'internal-error'
+  };
+  function prependCode(code) {
+      return 'storage/' + code;
+  }
+  function unknown() {
+      var message = 'An unknown error occurred, please check the error payload for ' +
+          'server response.';
+      return new FirebaseStorageError(Code.UNKNOWN, message);
+  }
+  function objectNotFound(path) {
+      return new FirebaseStorageError(Code.OBJECT_NOT_FOUND, "Object '" + path + "' does not exist.");
+  }
+  function quotaExceeded(bucket) {
+      return new FirebaseStorageError(Code.QUOTA_EXCEEDED, "Quota for bucket '" +
+          bucket +
+          "' exceeded, please view quota on " +
+          'https://firebase.google.com/pricing/.');
+  }
+  function unauthenticated() {
+      var message = 'User is not authenticated, please authenticate using Firebase ' +
+          'Authentication and try again.';
+      return new FirebaseStorageError(Code.UNAUTHENTICATED, message);
+  }
+  function unauthorized(path) {
+      return new FirebaseStorageError(Code.UNAUTHORIZED, "User does not have permission to access '" + path + "'.");
+  }
+  function retryLimitExceeded() {
+      return new FirebaseStorageError(Code.RETRY_LIMIT_EXCEEDED, 'Max retry time for operation exceeded, please try again.');
+  }
+  function canceled() {
+      return new FirebaseStorageError(Code.CANCELED, 'User canceled the upload/download.');
+  }
+  function invalidUrl(url) {
+      return new FirebaseStorageError(Code.INVALID_URL, "Invalid URL '" + url + "'.");
+  }
+  function invalidDefaultBucket(bucket) {
+      return new FirebaseStorageError(Code.INVALID_DEFAULT_BUCKET, "Invalid default bucket '" + bucket + "'.");
+  }
+  function noDefaultBucket() {
+      return new FirebaseStorageError(Code.NO_DEFAULT_BUCKET, 'No default bucket ' +
+          "found. Did you set the '" +
+          CONFIG_STORAGE_BUCKET_KEY +
+          "' property when initializing the app?");
+  }
+  function cannotSliceBlob() {
+      return new FirebaseStorageError(Code.CANNOT_SLICE_BLOB, 'Cannot slice blob for upload. Please retry the upload.');
+  }
+  function serverFileWrongSize() {
+      return new FirebaseStorageError(Code.SERVER_FILE_WRONG_SIZE, 'Server recorded incorrect upload file size, please retry the upload.');
+  }
+  function noDownloadURL() {
+      return new FirebaseStorageError(Code.NO_DOWNLOAD_URL, 'The given file does not have any download URLs.');
+  }
+  function invalidArgument(index, fnName, message) {
+      return new FirebaseStorageError(Code.INVALID_ARGUMENT, 'Invalid argument in `' + fnName + '` at index ' + index + ': ' + message);
+  }
+  function invalidArgumentCount(argMin, argMax, fnName, real) {
+      var countPart;
+      var plural;
+      if (argMin === argMax) {
+          countPart = argMin;
+          plural = argMin === 1 ? 'argument' : 'arguments';
+      }
+      else {
+          countPart = 'between ' + argMin + ' and ' + argMax;
+          plural = 'arguments';
+      }
+      return new FirebaseStorageError(Code.INVALID_ARGUMENT_COUNT, 'Invalid argument count in `' +
+          fnName +
+          '`: Expected ' +
+          countPart +
+          ' ' +
+          plural +
+          ', received ' +
+          real +
+          '.');
+  }
+  function appDeleted() {
+      return new FirebaseStorageError(Code.APP_DELETED, 'The Firebase app was deleted.');
+  }
+  /**
+   * @param name The name of the operation that was invalid.
+   */
+  function invalidRootOperation(name) {
+      return new FirebaseStorageError(Code.INVALID_ROOT_OPERATION, "The operation '" +
+          name +
+          "' cannot be performed on a root reference, create a non-root " +
+          "reference using child, such as .child('file.png').");
+  }
+  /**
+   * @param format The format that was not valid.
+   * @param message A message describing the format violation.
+   */
+  function invalidFormat(format, message) {
+      return new FirebaseStorageError(Code.INVALID_FORMAT, "String does not match format '" + format + "': " + message);
+  }
+  /**
+   * @param message A message describing the internal error.
+   */
+  function internalError(message) {
+      throw new FirebaseStorageError(Code.INTERNAL_ERROR, 'Internal error: ' + message);
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  var StringFormat = {
+      RAW: 'raw',
+      BASE64: 'base64',
+      BASE64URL: 'base64url',
+      DATA_URL: 'data_url'
+  };
+  function formatValidator(stringFormat) {
+      switch (stringFormat) {
+          case StringFormat.RAW:
+          case StringFormat.BASE64:
+          case StringFormat.BASE64URL:
+          case StringFormat.DATA_URL:
+              return;
+          default:
+              throw 'Expected one of the event types: [' +
+                  StringFormat.RAW +
+                  ', ' +
+                  StringFormat.BASE64 +
+                  ', ' +
+                  StringFormat.BASE64URL +
+                  ', ' +
+                  StringFormat.DATA_URL +
+                  '].';
+      }
+  }
+  /**
+   * @struct
+   */
+  var StringData = /** @class */ (function () {
+      function StringData(data, contentType) {
+          this.data = data;
+          this.contentType = contentType || null;
+      }
+      return StringData;
+  }());
+  function dataFromString(format, stringData) {
+      switch (format) {
+          case StringFormat.RAW:
+              return new StringData(utf8Bytes_(stringData));
+          case StringFormat.BASE64:
+          case StringFormat.BASE64URL:
+              return new StringData(base64Bytes_(format, stringData));
+          case StringFormat.DATA_URL:
+              return new StringData(dataURLBytes_(stringData), dataURLContentType_(stringData));
+          // do nothing
+      }
+      // assert(false);
+      throw unknown();
+  }
+  function utf8Bytes_(value) {
+      var b = [];
+      for (var i = 0; i < value.length; i++) {
+          var c = value.charCodeAt(i);
+          if (c <= 127) {
+              b.push(c);
+          }
+          else {
+              if (c <= 2047) {
+                  b.push(192 | (c >> 6), 128 | (c & 63));
+              }
+              else {
+                  if ((c & 64512) === 55296) {
+                      // The start of a surrogate pair.
+                      var valid = i < value.length - 1 && (value.charCodeAt(i + 1) & 64512) === 56320;
+                      if (!valid) {
+                          // The second surrogate wasn't there.
+                          b.push(239, 191, 189);
+                      }
+                      else {
+                          var hi = c;
+                          var lo = value.charCodeAt(++i);
+                          c = 65536 | ((hi & 1023) << 10) | (lo & 1023);
+                          b.push(240 | (c >> 18), 128 | ((c >> 12) & 63), 128 | ((c >> 6) & 63), 128 | (c & 63));
+                      }
+                  }
+                  else {
+                      if ((c & 64512) === 56320) {
+                          // Invalid low surrogate.
+                          b.push(239, 191, 189);
+                      }
+                      else {
+                          b.push(224 | (c >> 12), 128 | ((c >> 6) & 63), 128 | (c & 63));
+                      }
+                  }
+              }
+          }
+      }
+      return new Uint8Array(b);
+  }
+  function percentEncodedBytes_(value) {
+      var decoded;
+      try {
+          decoded = decodeURIComponent(value);
+      }
+      catch (e) {
+          throw invalidFormat(StringFormat.DATA_URL, 'Malformed data URL.');
+      }
+      return utf8Bytes_(decoded);
+  }
+  function base64Bytes_(format, value) {
+      switch (format) {
+          case StringFormat.BASE64: {
+              var hasMinus = value.indexOf('-') !== -1;
+              var hasUnder = value.indexOf('_') !== -1;
+              if (hasMinus || hasUnder) {
+                  var invalidChar = hasMinus ? '-' : '_';
+                  throw invalidFormat(format, "Invalid character '" +
+                      invalidChar +
+                      "' found: is it base64url encoded?");
+              }
+              break;
+          }
+          case StringFormat.BASE64URL: {
+              var hasPlus = value.indexOf('+') !== -1;
+              var hasSlash = value.indexOf('/') !== -1;
+              if (hasPlus || hasSlash) {
+                  var invalidChar = hasPlus ? '+' : '/';
+                  throw invalidFormat(format, "Invalid character '" + invalidChar + "' found: is it base64 encoded?");
+              }
+              value = value.replace(/-/g, '+').replace(/_/g, '/');
+              break;
+          }
+          // do nothing
+      }
+      var bytes;
+      try {
+          bytes = atob(value);
+      }
+      catch (e) {
+          throw invalidFormat(format, 'Invalid character found');
+      }
+      var array = new Uint8Array(bytes.length);
+      for (var i = 0; i < bytes.length; i++) {
+          array[i] = bytes.charCodeAt(i);
+      }
+      return array;
+  }
+  /**
+   * @struct
+   */
+  var DataURLParts = /** @class */ (function () {
+      function DataURLParts(dataURL) {
+          this.base64 = false;
+          this.contentType = null;
+          var matches = dataURL.match(/^data:([^,]+)?,/);
+          if (matches === null) {
+              throw invalidFormat(StringFormat.DATA_URL, "Must be formatted 'data:[<mediatype>][;base64],<data>");
+          }
+          var middle = matches[1] || null;
+          if (middle != null) {
+              this.base64 = endsWith(middle, ';base64');
+              this.contentType = this.base64
+                  ? middle.substring(0, middle.length - ';base64'.length)
+                  : middle;
+          }
+          this.rest = dataURL.substring(dataURL.indexOf(',') + 1);
+      }
+      return DataURLParts;
+  }());
+  function dataURLBytes_(dataUrl) {
+      var parts = new DataURLParts(dataUrl);
+      if (parts.base64) {
+          return base64Bytes_(StringFormat.BASE64, parts.rest);
+      }
+      else {
+          return percentEncodedBytes_(parts.rest);
+      }
+  }
+  function dataURLContentType_(dataUrl) {
+      var parts = new DataURLParts(dataUrl);
+      return parts.contentType;
+  }
+  function endsWith(s, end) {
+      var longEnough = s.length >= end.length;
+      if (!longEnough) {
+          return false;
+      }
+      return s.substring(s.length - end.length) === end;
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  var TaskEvent = {
+      /** Triggered whenever the task changes or progress is updated. */
+      STATE_CHANGED: 'state_changed'
+  };
+  var InternalTaskState = {
+      RUNNING: 'running',
+      PAUSING: 'pausing',
+      PAUSED: 'paused',
+      SUCCESS: 'success',
+      CANCELING: 'canceling',
+      CANCELED: 'canceled',
+      ERROR: 'error'
+  };
+  var TaskState = {
+      /** The task is currently transferring data. */
+      RUNNING: 'running',
+      /** The task was paused by the user. */
+      PAUSED: 'paused',
+      /** The task completed successfully. */
+      SUCCESS: 'success',
+      /** The task was canceled. */
+      CANCELED: 'canceled',
+      /** The task failed with an error. */
+      ERROR: 'error'
+  };
+  function taskStateFromInternalTaskState(state) {
+      switch (state) {
+          case InternalTaskState.RUNNING:
+          case InternalTaskState.PAUSING:
+          case InternalTaskState.CANCELING:
+              return TaskState.RUNNING;
+          case InternalTaskState.PAUSED:
+              return TaskState.PAUSED;
+          case InternalTaskState.SUCCESS:
+              return TaskState.SUCCESS;
+          case InternalTaskState.CANCELED:
+              return TaskState.CANCELED;
+          case InternalTaskState.ERROR:
+              return TaskState.ERROR;
+          default:
+              // TODO(andysoto): assert(false);
+              return TaskState.ERROR;
+      }
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @return False if the object is undefined or null, true otherwise.
+   */
+  function isDef(p) {
+      return p != null;
+  }
+  function isJustDef(p) {
+      return p !== void 0;
+  }
+  function isFunction(p) {
+      return typeof p === 'function';
+  }
+  function isObject$1(p) {
+      return typeof p === 'object';
+  }
+  function isNonNullObject(p) {
+      return isObject$1(p) && p !== null;
+  }
+  function isNonArrayObject(p) {
+      return isObject$1(p) && !Array.isArray(p);
+  }
+  function isString(p) {
+      return typeof p === 'string' || p instanceof String;
+  }
+  function isInteger(p) {
+      return isNumber(p) && Number.isInteger(p);
+  }
+  function isNumber(p) {
+      return typeof p === 'number' || p instanceof Number;
+  }
+  function isNativeBlob(p) {
+      return isNativeBlobDefined() && p instanceof Blob;
+  }
+  function isNativeBlobDefined() {
+      return typeof Blob !== 'undefined';
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @enum{number}
+   */
+  var ErrorCode;
+  (function (ErrorCode) {
+      ErrorCode[ErrorCode["NO_ERROR"] = 0] = "NO_ERROR";
+      ErrorCode[ErrorCode["NETWORK_ERROR"] = 1] = "NETWORK_ERROR";
+      ErrorCode[ErrorCode["ABORT"] = 2] = "ABORT";
+  })(ErrorCode || (ErrorCode = {}));
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * We use this instead of goog.net.XhrIo because goog.net.XhrIo is hyuuuuge and
+   * doesn't work in React Native on Android.
+   */
+  var NetworkXhrIo = /** @class */ (function () {
+      function NetworkXhrIo() {
+          var _this = this;
+          this.sent_ = false;
+          this.xhr_ = new XMLHttpRequest();
+          this.errorCode_ = ErrorCode.NO_ERROR;
+          this.sendPromise_ = new Promise(function (resolve) {
+              _this.xhr_.addEventListener('abort', function () {
+                  _this.errorCode_ = ErrorCode.ABORT;
+                  resolve(_this);
+              });
+              _this.xhr_.addEventListener('error', function () {
+                  _this.errorCode_ = ErrorCode.NETWORK_ERROR;
+                  resolve(_this);
+              });
+              _this.xhr_.addEventListener('load', function () {
+                  resolve(_this);
+              });
+          });
+      }
+      /**
+       * @override
+       */
+      NetworkXhrIo.prototype.send = function (url, method, body, headers) {
+          if (this.sent_) {
+              throw internalError('cannot .send() more than once');
+          }
+          this.sent_ = true;
+          this.xhr_.open(method, url, true);
+          if (isDef(headers)) {
+              for (var key in headers) {
+                  if (headers.hasOwnProperty(key)) {
+                      this.xhr_.setRequestHeader(key, headers[key].toString());
+                  }
+              }
+          }
+          if (isDef(body)) {
+              this.xhr_.send(body);
+          }
+          else {
+              this.xhr_.send();
+          }
+          return this.sendPromise_;
+      };
+      /**
+       * @override
+       */
+      NetworkXhrIo.prototype.getErrorCode = function () {
+          if (!this.sent_) {
+              throw internalError('cannot .getErrorCode() before sending');
+          }
+          return this.errorCode_;
+      };
+      /**
+       * @override
+       */
+      NetworkXhrIo.prototype.getStatus = function () {
+          if (!this.sent_) {
+              throw internalError('cannot .getStatus() before sending');
+          }
+          try {
+              return this.xhr_.status;
+          }
+          catch (e) {
+              return -1;
+          }
+      };
+      /**
+       * @override
+       */
+      NetworkXhrIo.prototype.getResponseText = function () {
+          if (!this.sent_) {
+              throw internalError('cannot .getResponseText() before sending');
+          }
+          return this.xhr_.responseText;
+      };
+      /**
+       * Aborts the request.
+       * @override
+       */
+      NetworkXhrIo.prototype.abort = function () {
+          this.xhr_.abort();
+      };
+      /**
+       * @override
+       */
+      NetworkXhrIo.prototype.getResponseHeader = function (header) {
+          return this.xhr_.getResponseHeader(header);
+      };
+      /**
+       * @override
+       */
+      NetworkXhrIo.prototype.addUploadProgressListener = function (listener) {
+          if (isDef(this.xhr_.upload)) {
+              this.xhr_.upload.addEventListener('progress', listener);
+          }
+      };
+      /**
+       * @override
+       */
+      NetworkXhrIo.prototype.removeUploadProgressListener = function (listener) {
+          if (isDef(this.xhr_.upload)) {
+              this.xhr_.upload.removeEventListener('progress', listener);
+          }
+      };
+      return NetworkXhrIo;
+  }());
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * Factory-like class for creating XhrIo instances.
+   */
+  var XhrIoPool = /** @class */ (function () {
+      function XhrIoPool() {
+      }
+      XhrIoPool.prototype.createXhrIo = function () {
+          return new NetworkXhrIo();
+      };
+      return XhrIoPool;
+  }());
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  function getBlobBuilder() {
+      if (typeof BlobBuilder !== 'undefined') {
+          return BlobBuilder;
+      }
+      else if (typeof WebKitBlobBuilder !== 'undefined') {
+          return WebKitBlobBuilder;
+      }
+      else {
+          return undefined;
+      }
+  }
+  /**
+   * Concatenates one or more values together and converts them to a Blob.
+   *
+   * @param args The values that will make up the resulting blob.
+   * @return The blob.
+   */
+  function getBlob() {
+      var args = [];
+      for (var _i = 0; _i < arguments.length; _i++) {
+          args[_i] = arguments[_i];
+      }
+      var BlobBuilder = getBlobBuilder();
+      if (BlobBuilder !== undefined) {
+          var bb = new BlobBuilder();
+          for (var i = 0; i < args.length; i++) {
+              bb.append(args[i]);
+          }
+          return bb.getBlob();
+      }
+      else {
+          if (isNativeBlobDefined()) {
+              return new Blob(args);
+          }
+          else {
+              throw Error("This browser doesn't seem to support creating Blobs");
+          }
+      }
+  }
+  /**
+   * Slices the blob. The returned blob contains data from the start byte
+   * (inclusive) till the end byte (exclusive). Negative indices cannot be used.
+   *
+   * @param blob The blob to be sliced.
+   * @param start Index of the starting byte.
+   * @param end Index of the ending byte.
+   * @return The blob slice or null if not supported.
+   */
+  function sliceBlob(blob, start, end) {
+      if (blob.webkitSlice) {
+          return blob.webkitSlice(start, end);
+      }
+      else if (blob.mozSlice) {
+          return blob.mozSlice(start, end);
+      }
+      else if (blob.slice) {
+          return blob.slice(start, end);
+      }
+      return null;
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @param opt_elideCopy If true, doesn't copy mutable input data
+   *     (e.g. Uint8Arrays). Pass true only if you know the objects will not be
+   *     modified after this blob's construction.
+   */
+  var FbsBlob = /** @class */ (function () {
+      function FbsBlob(data, elideCopy) {
+          var size = 0;
+          var blobType = '';
+          if (isNativeBlob(data)) {
+              this.data_ = data;
+              size = data.size;
+              blobType = data.type;
+          }
+          else if (data instanceof ArrayBuffer) {
+              if (elideCopy) {
+                  this.data_ = new Uint8Array(data);
+              }
+              else {
+                  this.data_ = new Uint8Array(data.byteLength);
+                  this.data_.set(new Uint8Array(data));
+              }
+              size = this.data_.length;
+          }
+          else if (data instanceof Uint8Array) {
+              if (elideCopy) {
+                  this.data_ = data;
+              }
+              else {
+                  this.data_ = new Uint8Array(data.length);
+                  this.data_.set(data);
+              }
+              size = data.length;
+          }
+          this.size_ = size;
+          this.type_ = blobType;
+      }
+      FbsBlob.prototype.size = function () {
+          return this.size_;
+      };
+      FbsBlob.prototype.type = function () {
+          return this.type_;
+      };
+      FbsBlob.prototype.slice = function (startByte, endByte) {
+          if (isNativeBlob(this.data_)) {
+              var realBlob = this.data_;
+              var sliced = sliceBlob(realBlob, startByte, endByte);
+              if (sliced === null) {
+                  return null;
+              }
+              return new FbsBlob(sliced);
+          }
+          else {
+              var slice = new Uint8Array(this.data_.buffer, startByte, endByte - startByte);
+              return new FbsBlob(slice, true);
+          }
+      };
+      FbsBlob.getBlob = function () {
+          var args = [];
+          for (var _i = 0; _i < arguments.length; _i++) {
+              args[_i] = arguments[_i];
+          }
+          if (isNativeBlobDefined()) {
+              var blobby = args.map(function (val) {
+                  if (val instanceof FbsBlob) {
+                      return val.data_;
+                  }
+                  else {
+                      return val;
+                  }
+              });
+              return new FbsBlob(getBlob.apply(null, blobby));
+          }
+          else {
+              var uint8Arrays = args.map(function (val) {
+                  if (isString(val)) {
+                      return dataFromString(StringFormat.RAW, val).data;
+                  }
+                  else {
+                      // Blobs don't exist, so this has to be a Uint8Array.
+                      return val.data_;
+                  }
+              });
+              var finalLength_1 = 0;
+              uint8Arrays.forEach(function (array) {
+                  finalLength_1 += array.byteLength;
+              });
+              var merged_1 = new Uint8Array(finalLength_1);
+              var index_1 = 0;
+              uint8Arrays.forEach(function (array) {
+                  for (var i = 0; i < array.length; i++) {
+                      merged_1[index_1++] = array[i];
+                  }
+              });
+              return new FbsBlob(merged_1, true);
+          }
+      };
+      FbsBlob.prototype.uploadData = function () {
+          return this.data_;
+      };
+      return FbsBlob;
+  }());
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @struct
+   */
+  var Location = /** @class */ (function () {
+      function Location(bucket, path) {
+          this.bucket = bucket;
+          this.path_ = path;
+      }
+      Object.defineProperty(Location.prototype, "path", {
+          get: function () {
+              return this.path_;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(Location.prototype, "isRoot", {
+          get: function () {
+              return this.path.length === 0;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Location.prototype.fullServerUrl = function () {
+          var encode = encodeURIComponent;
+          return '/b/' + encode(this.bucket) + '/o/' + encode(this.path);
+      };
+      Location.prototype.bucketOnlyServerUrl = function () {
+          var encode = encodeURIComponent;
+          return '/b/' + encode(this.bucket) + '/o';
+      };
+      Location.makeFromBucketSpec = function (bucketString) {
+          var bucketLocation;
+          try {
+              bucketLocation = Location.makeFromUrl(bucketString);
+          }
+          catch (e) {
+              // Not valid URL, use as-is. This lets you put bare bucket names in
+              // config.
+              return new Location(bucketString, '');
+          }
+          if (bucketLocation.path === '') {
+              return bucketLocation;
+          }
+          else {
+              throw invalidDefaultBucket(bucketString);
+          }
+      };
+      Location.makeFromUrl = function (url) {
+          var location = null;
+          var bucketDomain = '([A-Za-z0-9.\\-_]+)';
+          function gsModify(loc) {
+              if (loc.path.charAt(loc.path.length - 1) === '/') {
+                  loc.path_ = loc.path_.slice(0, -1);
+              }
+          }
+          var gsPath = '(/(.*))?$';
+          var path = '(/([^?#]*).*)?$';
+          var gsRegex = new RegExp('^gs://' + bucketDomain + gsPath, 'i');
+          var gsIndices = { bucket: 1, path: 3 };
+          function httpModify(loc) {
+              loc.path_ = decodeURIComponent(loc.path);
+          }
+          var version = 'v[A-Za-z0-9_]+';
+          var hostRegex = DEFAULT_HOST.replace(/[.]/g, '\\.');
+          var httpRegex = new RegExp("^https?://" + hostRegex + "/" + version + "/b/" + bucketDomain + "/o" + path, 'i');
+          var httpIndices = { bucket: 1, path: 3 };
+          var groups = [
+              { regex: gsRegex, indices: gsIndices, postModify: gsModify },
+              { regex: httpRegex, indices: httpIndices, postModify: httpModify }
+          ];
+          for (var i = 0; i < groups.length; i++) {
+              var group = groups[i];
+              var captures = group.regex.exec(url);
+              if (captures) {
+                  var bucketValue = captures[group.indices.bucket];
+                  var pathValue = captures[group.indices.path];
+                  if (!pathValue) {
+                      pathValue = '';
+                  }
+                  location = new Location(bucketValue, pathValue);
+                  group.postModify(location);
+                  break;
+              }
+          }
+          if (location == null) {
+              throw invalidUrl(url);
+          }
+          return location;
+      };
+      return Location;
+  }());
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * Returns the Object resulting from parsing the given JSON, or null if the
+   * given string does not represent a JSON object.
+   */
+  function jsonObjectOrNull(s) {
+      var obj;
+      try {
+          obj = JSON.parse(s);
+      }
+      catch (e) {
+          return null;
+      }
+      if (isNonArrayObject(obj)) {
+          return obj;
+      }
+      else {
+          return null;
+      }
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @fileoverview Contains helper methods for manipulating paths.
+   */
+  /**
+   * @return Null if the path is already at the root.
+   */
+  function parent(path) {
+      if (path.length === 0) {
+          return null;
+      }
+      var index = path.lastIndexOf('/');
+      if (index === -1) {
+          return '';
+      }
+      var newPath = path.slice(0, index);
+      return newPath;
+  }
+  function child(path, childPath) {
+      var canonicalChildPath = childPath
+          .split('/')
+          .filter(function (component) { return component.length > 0; })
+          .join('/');
+      if (path.length === 0) {
+          return canonicalChildPath;
+      }
+      else {
+          return path + '/' + canonicalChildPath;
+      }
+  }
+  /**
+   * Returns the last component of a path.
+   * '/foo/bar' -> 'bar'
+   * '/foo/bar/baz/' -> 'baz/'
+   * '/a' -> 'a'
+   */
+  function lastComponent(path) {
+      var index = path.lastIndexOf('/', path.length - 2);
+      if (index === -1) {
+          return path;
+      }
+      else {
+          return path.slice(index + 1);
+      }
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  function makeUrl(urlPart) {
+      return "https://" + DEFAULT_HOST + "/v0" + urlPart;
+  }
+  function makeQueryString(params) {
+      var encode = encodeURIComponent;
+      var queryPart = '?';
+      for (var key in params) {
+          if (params.hasOwnProperty(key)) {
+              // @ts-ignore TODO: remove once typescript is upgraded to 3.5.x
+              var nextPart = encode(key) + '=' + encode(params[key]);
+              queryPart = queryPart + nextPart + '&';
+          }
+      }
+      // Chop off the extra '&' or '?' on the end
+      queryPart = queryPart.slice(0, -1);
+      return queryPart;
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  function noXform_(metadata, value) {
+      return value;
+  }
+  /**
+   * @struct
+   */
+  var Mapping = /** @class */ (function () {
+      function Mapping(server, local, writable, xform) {
+          this.server = server;
+          this.local = local || server;
+          this.writable = !!writable;
+          this.xform = xform || noXform_;
+      }
+      return Mapping;
+  }());
+  var mappings_ = null;
+  function xformPath(fullPath) {
+      if (!isString(fullPath) || fullPath.length < 2) {
+          return fullPath;
+      }
+      else {
+          return lastComponent(fullPath);
+      }
+  }
+  function getMappings() {
+      if (mappings_) {
+          return mappings_;
+      }
+      var mappings = [];
+      mappings.push(new Mapping('bucket'));
+      mappings.push(new Mapping('generation'));
+      mappings.push(new Mapping('metageneration'));
+      mappings.push(new Mapping('name', 'fullPath', true));
+      function mappingsXformPath(_metadata, fullPath) {
+          return xformPath(fullPath);
+      }
+      var nameMapping = new Mapping('name');
+      nameMapping.xform = mappingsXformPath;
+      mappings.push(nameMapping);
+      /**
+       * Coerces the second param to a number, if it is defined.
+       */
+      function xformSize(_metadata, size) {
+          if (isDef(size)) {
+              return Number(size);
+          }
+          else {
+              return size;
+          }
+      }
+      var sizeMapping = new Mapping('size');
+      sizeMapping.xform = xformSize;
+      mappings.push(sizeMapping);
+      mappings.push(new Mapping('timeCreated'));
+      mappings.push(new Mapping('updated'));
+      mappings.push(new Mapping('md5Hash', null, true));
+      mappings.push(new Mapping('cacheControl', null, true));
+      mappings.push(new Mapping('contentDisposition', null, true));
+      mappings.push(new Mapping('contentEncoding', null, true));
+      mappings.push(new Mapping('contentLanguage', null, true));
+      mappings.push(new Mapping('contentType', null, true));
+      mappings.push(new Mapping('metadata', 'customMetadata', true));
+      mappings_ = mappings;
+      return mappings_;
+  }
+  function addRef(metadata, authWrapper) {
+      function generateRef() {
+          var bucket = metadata['bucket'];
+          var path = metadata['fullPath'];
+          var loc = new Location(bucket, path);
+          return authWrapper.makeStorageReference(loc);
+      }
+      Object.defineProperty(metadata, 'ref', { get: generateRef });
+  }
+  function fromResource(authWrapper, resource, mappings) {
+      var metadata = {};
+      metadata['type'] = 'file';
+      var len = mappings.length;
+      for (var i = 0; i < len; i++) {
+          var mapping = mappings[i];
+          metadata[mapping.local] = mapping.xform(metadata, resource[mapping.server]);
+      }
+      addRef(metadata, authWrapper);
+      return metadata;
+  }
+  function fromResourceString(authWrapper, resourceString, mappings) {
+      var obj = jsonObjectOrNull(resourceString);
+      if (obj === null) {
+          return null;
+      }
+      var resource = obj;
+      return fromResource(authWrapper, resource, mappings);
+  }
+  function downloadUrlFromResourceString(metadata, resourceString) {
+      var obj = jsonObjectOrNull(resourceString);
+      if (obj === null) {
+          return null;
+      }
+      if (!isString(obj['downloadTokens'])) {
+          // This can happen if objects are uploaded through GCS and retrieved
+          // through list, so we don't want to throw an Error.
+          return null;
+      }
+      var tokens = obj['downloadTokens'];
+      if (tokens.length === 0) {
+          return null;
+      }
+      var encode = encodeURIComponent;
+      var tokensList = tokens.split(',');
+      var urls = tokensList.map(function (token) {
+          var bucket = metadata['bucket'];
+          var path = metadata['fullPath'];
+          var urlPart = '/b/' + encode(bucket) + '/o/' + encode(path);
+          var base = makeUrl(urlPart);
+          var queryString = makeQueryString({
+              alt: 'media',
+              token: token
+          });
+          return base + queryString;
+      });
+      return urls[0];
+  }
+  function toResourceString(metadata, mappings) {
+      var resource = {};
+      var len = mappings.length;
+      for (var i = 0; i < len; i++) {
+          var mapping = mappings[i];
+          if (mapping.writable) {
+              resource[mapping.server] = metadata[mapping.local];
+          }
+      }
+      return JSON.stringify(resource);
+  }
+  function metadataValidator(p) {
+      if (!isObject$1(p) || !p) {
+          throw 'Expected Metadata object.';
+      }
+      for (var key in p) {
+          if (p.hasOwnProperty(key)) {
+              var val = p[key];
+              if (key === 'customMetadata') {
+                  if (!isObject$1(val)) {
+                      throw 'Expected object for \'customMetadata\' mapping.';
+                  }
+              }
+              else {
+                  if (isNonNullObject(val)) {
+                      throw "Mapping for '" + key + "' cannot be an object.";
+                  }
+              }
+          }
+      }
+  }
+
+  /**
+   * @license
+   * Copyright 2019 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  var MAX_RESULTS_KEY = 'maxResults';
+  var MAX_MAX_RESULTS = 1000;
+  var PAGE_TOKEN_KEY = 'pageToken';
+  var PREFIXES_KEY = 'prefixes';
+  var ITEMS_KEY = 'items';
+  function fromBackendResponse(authWrapper, resource) {
+      var listResult = {
+          prefixes: [],
+          items: [],
+          nextPageToken: resource['nextPageToken']
+      };
+      var bucket = authWrapper.bucket();
+      if (bucket === null) {
+          throw noDefaultBucket();
+      }
+      if (resource[PREFIXES_KEY]) {
+          for (var _i = 0, _a = resource[PREFIXES_KEY]; _i < _a.length; _i++) {
+              var path = _a[_i];
+              var pathWithoutTrailingSlash = path.replace(/\/$/, '');
+              var reference = authWrapper.makeStorageReference(new Location(bucket, pathWithoutTrailingSlash));
+              listResult.prefixes.push(reference);
+          }
+      }
+      if (resource[ITEMS_KEY]) {
+          for (var _b = 0, _c = resource[ITEMS_KEY]; _b < _c.length; _b++) {
+              var item = _c[_b];
+              var reference = authWrapper.makeStorageReference(new Location(bucket, item['name']));
+              listResult.items.push(reference);
+          }
+      }
+      return listResult;
+  }
+  function fromResponseString(authWrapper, resourceString) {
+      var obj = jsonObjectOrNull(resourceString);
+      if (obj === null) {
+          return null;
+      }
+      var resource = obj;
+      return fromBackendResponse(authWrapper, resource);
+  }
+  function listOptionsValidator(p) {
+      if (!isObject$1(p) || !p) {
+          throw 'Expected ListOptions object.';
+      }
+      for (var key in p) {
+          if (key === MAX_RESULTS_KEY) {
+              if (!isInteger(p[MAX_RESULTS_KEY]) ||
+                  p[MAX_RESULTS_KEY] <= 0) {
+                  throw 'Expected maxResults to be a positive number.';
+              }
+              if (p[MAX_RESULTS_KEY] > 1000) {
+                  throw "Expected maxResults to be less than or equal to " + MAX_MAX_RESULTS + ".";
+              }
+          }
+          else if (key === PAGE_TOKEN_KEY) {
+              if (p[PAGE_TOKEN_KEY] && !isString(p[PAGE_TOKEN_KEY])) {
+                  throw 'Expected pageToken to be string.';
+              }
+          }
+          else {
+              throw 'Unknown option: ' + key;
+          }
+      }
+  }
+
+  var RequestInfo = /** @class */ (function () {
+      function RequestInfo(url, method, 
+      /**
+       * Returns the value with which to resolve the request's promise. Only called
+       * if the request is successful. Throw from this function to reject the
+       * returned Request's promise with the thrown error.
+       * Note: The XhrIo passed to this function may be reused after this callback
+       * returns. Do not keep a reference to it in any way.
+       */
+      handler, timeout) {
+          this.url = url;
+          this.method = method;
+          this.handler = handler;
+          this.timeout = timeout;
+          this.urlParams = {};
+          this.headers = {};
+          this.body = null;
+          this.errorHandler = null;
+          /**
+           * Called with the current number of bytes uploaded and total size (-1 if not
+           * computable) of the request body (i.e. used to report upload progress).
+           */
+          this.progressCallback = null;
+          this.successCodes = [200];
+          this.additionalRetryCodes = [];
+      }
+      return RequestInfo;
+  }());
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * Throws the UNKNOWN FirebaseStorageError if cndn is false.
+   */
+  function handlerCheck(cndn) {
+      if (!cndn) {
+          throw unknown();
+      }
+  }
+  function metadataHandler(authWrapper, mappings) {
+      function handler(xhr, text) {
+          var metadata = fromResourceString(authWrapper, text, mappings);
+          handlerCheck(metadata !== null);
+          return metadata;
+      }
+      return handler;
+  }
+  function listHandler(authWrapper) {
+      function handler(xhr, text) {
+          var listResult = fromResponseString(authWrapper, text);
+          handlerCheck(listResult !== null);
+          return listResult;
+      }
+      return handler;
+  }
+  function downloadUrlHandler(authWrapper, mappings) {
+      function handler(xhr, text) {
+          var metadata = fromResourceString(authWrapper, text, mappings);
+          handlerCheck(metadata !== null);
+          return downloadUrlFromResourceString(metadata, text);
+      }
+      return handler;
+  }
+  function sharedErrorHandler(location) {
+      function errorHandler(xhr, err) {
+          var newErr;
+          if (xhr.getStatus() === 401) {
+              newErr = unauthenticated();
+          }
+          else {
+              if (xhr.getStatus() === 402) {
+                  newErr = quotaExceeded(location.bucket);
+              }
+              else {
+                  if (xhr.getStatus() === 403) {
+                      newErr = unauthorized(location.path);
+                  }
+                  else {
+                      newErr = err;
+                  }
+              }
+          }
+          newErr.setServerResponseProp(err.serverResponseProp());
+          return newErr;
+      }
+      return errorHandler;
+  }
+  function objectErrorHandler(location) {
+      var shared = sharedErrorHandler(location);
+      function errorHandler(xhr, err) {
+          var newErr = shared(xhr, err);
+          if (xhr.getStatus() === 404) {
+              newErr = objectNotFound(location.path);
+          }
+          newErr.setServerResponseProp(err.serverResponseProp());
+          return newErr;
+      }
+      return errorHandler;
+  }
+  function getMetadata(authWrapper, location, mappings) {
+      var urlPart = location.fullServerUrl();
+      var url = makeUrl(urlPart);
+      var method = 'GET';
+      var timeout = authWrapper.maxOperationRetryTime();
+      var requestInfo = new RequestInfo(url, method, metadataHandler(authWrapper, mappings), timeout);
+      requestInfo.errorHandler = objectErrorHandler(location);
+      return requestInfo;
+  }
+  function list(authWrapper, location, delimiter, pageToken, maxResults) {
+      var urlParams = {};
+      if (location.isRoot) {
+          urlParams['prefix'] = '';
+      }
+      else {
+          urlParams['prefix'] = location.path + '/';
+      }
+      if (delimiter && delimiter.length > 0) {
+          urlParams['delimiter'] = delimiter;
+      }
+      if (pageToken) {
+          urlParams['pageToken'] = pageToken;
+      }
+      if (maxResults) {
+          urlParams['maxResults'] = maxResults;
+      }
+      var urlPart = location.bucketOnlyServerUrl();
+      var url = makeUrl(urlPart);
+      var method = 'GET';
+      var timeout = authWrapper.maxOperationRetryTime();
+      var requestInfo = new RequestInfo(url, method, listHandler(authWrapper), timeout);
+      requestInfo.urlParams = urlParams;
+      requestInfo.errorHandler = sharedErrorHandler(location);
+      return requestInfo;
+  }
+  function getDownloadUrl(authWrapper, location, mappings) {
+      var urlPart = location.fullServerUrl();
+      var url = makeUrl(urlPart);
+      var method = 'GET';
+      var timeout = authWrapper.maxOperationRetryTime();
+      var requestInfo = new RequestInfo(url, method, downloadUrlHandler(authWrapper, mappings), timeout);
+      requestInfo.errorHandler = objectErrorHandler(location);
+      return requestInfo;
+  }
+  function updateMetadata(authWrapper, location, metadata, mappings) {
+      var urlPart = location.fullServerUrl();
+      var url = makeUrl(urlPart);
+      var method = 'PATCH';
+      var body = toResourceString(metadata, mappings);
+      var headers = { 'Content-Type': 'application/json; charset=utf-8' };
+      var timeout = authWrapper.maxOperationRetryTime();
+      var requestInfo = new RequestInfo(url, method, metadataHandler(authWrapper, mappings), timeout);
+      requestInfo.headers = headers;
+      requestInfo.body = body;
+      requestInfo.errorHandler = objectErrorHandler(location);
+      return requestInfo;
+  }
+  function deleteObject(authWrapper, location) {
+      var urlPart = location.fullServerUrl();
+      var url = makeUrl(urlPart);
+      var method = 'DELETE';
+      var timeout = authWrapper.maxOperationRetryTime();
+      function handler(_xhr, _text) { }
+      var requestInfo = new RequestInfo(url, method, handler, timeout);
+      requestInfo.successCodes = [200, 204];
+      requestInfo.errorHandler = objectErrorHandler(location);
+      return requestInfo;
+  }
+  function determineContentType_(metadata, blob) {
+      return ((metadata && metadata['contentType']) ||
+          (blob && blob.type()) ||
+          'application/octet-stream');
+  }
+  function metadataForUpload_(location, blob, metadata) {
+      var metadataClone = Object.assign({}, metadata);
+      metadataClone['fullPath'] = location.path;
+      metadataClone['size'] = blob.size();
+      if (!metadataClone['contentType']) {
+          metadataClone['contentType'] = determineContentType_(null, blob);
+      }
+      return metadataClone;
+  }
+  function multipartUpload(authWrapper, location, mappings, blob, metadata) {
+      var urlPart = location.bucketOnlyServerUrl();
+      var headers = {
+          'X-Goog-Upload-Protocol': 'multipart'
+      };
+      function genBoundary() {
+          var str = '';
+          for (var i = 0; i < 2; i++) {
+              str =
+                  str +
+                      Math.random()
+                          .toString()
+                          .slice(2);
+          }
+          return str;
+      }
+      var boundary = genBoundary();
+      headers['Content-Type'] = 'multipart/related; boundary=' + boundary;
+      var metadata_ = metadataForUpload_(location, blob, metadata);
+      var metadataString = toResourceString(metadata_, mappings);
+      var preBlobPart = '--' +
+          boundary +
+          '\r\n' +
+          'Content-Type: application/json; charset=utf-8\r\n\r\n' +
+          metadataString +
+          '\r\n--' +
+          boundary +
+          '\r\n' +
+          'Content-Type: ' +
+          metadata_['contentType'] +
+          '\r\n\r\n';
+      var postBlobPart = '\r\n--' + boundary + '--';
+      var body = FbsBlob.getBlob(preBlobPart, blob, postBlobPart);
+      if (body === null) {
+          throw cannotSliceBlob();
+      }
+      var urlParams = { name: metadata_['fullPath'] };
+      var url = makeUrl(urlPart);
+      var method = 'POST';
+      var timeout = authWrapper.maxUploadRetryTime();
+      var requestInfo = new RequestInfo(url, method, metadataHandler(authWrapper, mappings), timeout);
+      requestInfo.urlParams = urlParams;
+      requestInfo.headers = headers;
+      requestInfo.body = body.uploadData();
+      requestInfo.errorHandler = sharedErrorHandler(location);
+      return requestInfo;
+  }
+  /**
+   * @param current The number of bytes that have been uploaded so far.
+   * @param total The total number of bytes in the upload.
+   * @param opt_finalized True if the server has finished the upload.
+   * @param opt_metadata The upload metadata, should
+   *     only be passed if opt_finalized is true.
+   * @struct
+   */
+  var ResumableUploadStatus = /** @class */ (function () {
+      function ResumableUploadStatus(current, total, finalized, metadata) {
+          this.current = current;
+          this.total = total;
+          this.finalized = !!finalized;
+          this.metadata = metadata || null;
+      }
+      return ResumableUploadStatus;
+  }());
+  function checkResumeHeader_(xhr, allowed) {
+      var status = null;
+      try {
+          status = xhr.getResponseHeader('X-Goog-Upload-Status');
+      }
+      catch (e) {
+          handlerCheck(false);
+      }
+      var allowedStatus = allowed || ['active'];
+      handlerCheck(!!status && allowedStatus.indexOf(status) !== -1);
+      return status;
+  }
+  function createResumableUpload(authWrapper, location, mappings, blob, metadata) {
+      var urlPart = location.bucketOnlyServerUrl();
+      var metadataForUpload = metadataForUpload_(location, blob, metadata);
+      var urlParams = { name: metadataForUpload['fullPath'] };
+      var url = makeUrl(urlPart);
+      var method = 'POST';
+      var headers = {
+          'X-Goog-Upload-Protocol': 'resumable',
+          'X-Goog-Upload-Command': 'start',
+          'X-Goog-Upload-Header-Content-Length': blob.size(),
+          'X-Goog-Upload-Header-Content-Type': metadataForUpload['contentType'],
+          'Content-Type': 'application/json; charset=utf-8'
+      };
+      var body = toResourceString(metadataForUpload, mappings);
+      var timeout = authWrapper.maxUploadRetryTime();
+      function handler(xhr) {
+          checkResumeHeader_(xhr);
+          var url;
+          try {
+              url = xhr.getResponseHeader('X-Goog-Upload-URL');
+          }
+          catch (e) {
+              handlerCheck(false);
+          }
+          handlerCheck(isString(url));
+          return url;
+      }
+      var requestInfo = new RequestInfo(url, method, handler, timeout);
+      requestInfo.urlParams = urlParams;
+      requestInfo.headers = headers;
+      requestInfo.body = body;
+      requestInfo.errorHandler = sharedErrorHandler(location);
+      return requestInfo;
+  }
+  /**
+   * @param url From a call to fbs.requests.createResumableUpload.
+   */
+  function getResumableUploadStatus(authWrapper, location, url, blob) {
+      var headers = { 'X-Goog-Upload-Command': 'query' };
+      function handler(xhr) {
+          var status = checkResumeHeader_(xhr, ['active', 'final']);
+          var sizeString = null;
+          try {
+              sizeString = xhr.getResponseHeader('X-Goog-Upload-Size-Received');
+          }
+          catch (e) {
+              handlerCheck(false);
+          }
+          if (!sizeString) {
+              // null or empty string
+              handlerCheck(false);
+          }
+          var size = Number(sizeString);
+          handlerCheck(!isNaN(size));
+          return new ResumableUploadStatus(size, blob.size(), status === 'final');
+      }
+      var method = 'POST';
+      var timeout = authWrapper.maxUploadRetryTime();
+      var requestInfo = new RequestInfo(url, method, handler, timeout);
+      requestInfo.headers = headers;
+      requestInfo.errorHandler = sharedErrorHandler(location);
+      return requestInfo;
+  }
+  /**
+   * Any uploads via the resumable upload API must transfer a number of bytes
+   * that is a multiple of this number.
+   */
+  var resumableUploadChunkSize = 256 * 1024;
+  /**
+   * @param url From a call to fbs.requests.createResumableUpload.
+   * @param chunkSize Number of bytes to upload.
+   * @param status The previous status.
+   *     If not passed or null, we start from the beginning.
+   * @throws fbs.Error If the upload is already complete, the passed in status
+   *     has a final size inconsistent with the blob, or the blob cannot be sliced
+   *     for upload.
+   */
+  function continueResumableUpload(location, authWrapper, url, blob, chunkSize, mappings, status, progressCallback) {
+      // TODO(andysoto): standardize on internal asserts
+      // assert(!(opt_status && opt_status.finalized));
+      var status_ = new ResumableUploadStatus(0, 0);
+      if (status) {
+          status_.current = status.current;
+          status_.total = status.total;
+      }
+      else {
+          status_.current = 0;
+          status_.total = blob.size();
+      }
+      if (blob.size() !== status_.total) {
+          throw serverFileWrongSize();
+      }
+      var bytesLeft = status_.total - status_.current;
+      var bytesToUpload = bytesLeft;
+      if (chunkSize > 0) {
+          bytesToUpload = Math.min(bytesToUpload, chunkSize);
+      }
+      var startByte = status_.current;
+      var endByte = startByte + bytesToUpload;
+      var uploadCommand = bytesToUpload === bytesLeft ? 'upload, finalize' : 'upload';
+      var headers = {
+          'X-Goog-Upload-Command': uploadCommand,
+          'X-Goog-Upload-Offset': status_.current
+      };
+      var body = blob.slice(startByte, endByte);
+      if (body === null) {
+          throw cannotSliceBlob();
+      }
+      function handler(xhr, text) {
+          // TODO(andysoto): Verify the MD5 of each uploaded range:
+          // the 'x-range-md5' header comes back with status code 308 responses.
+          // We'll only be able to bail out though, because you can't re-upload a
+          // range that you previously uploaded.
+          var uploadStatus = checkResumeHeader_(xhr, ['active', 'final']);
+          var newCurrent = status_.current + bytesToUpload;
+          var size = blob.size();
+          var metadata;
+          if (uploadStatus === 'final') {
+              metadata = metadataHandler(authWrapper, mappings)(xhr, text);
+          }
+          else {
+              metadata = null;
+          }
+          return new ResumableUploadStatus(newCurrent, size, uploadStatus === 'final', metadata);
+      }
+      var method = 'POST';
+      var timeout = authWrapper.maxUploadRetryTime();
+      var requestInfo = new RequestInfo(url, method, handler, timeout);
+      requestInfo.headers = headers;
+      requestInfo.body = body.uploadData();
+      requestInfo.progressCallback = progressCallback || null;
+      requestInfo.errorHandler = sharedErrorHandler(location);
+      return requestInfo;
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @struct
+   */
+  var Observer = /** @class */ (function () {
+      function Observer(nextOrObserver, error, complete) {
+          var asFunctions = isFunction(nextOrObserver) ||
+              isDef(error) ||
+              isDef(complete);
+          if (asFunctions) {
+              this.next = nextOrObserver;
+              this.error = error || null;
+              this.complete = complete || null;
+          }
+          else {
+              var observer = nextOrObserver;
+              this.next = observer.next || null;
+              this.error = observer.error || null;
+              this.complete = observer.complete || null;
+          }
+      }
+      return Observer;
+  }());
+
+  var UploadTaskSnapshot = /** @class */ (function () {
+      function UploadTaskSnapshot(bytesTransferred, totalBytes, state, metadata, task, ref) {
+          this.bytesTransferred = bytesTransferred;
+          this.totalBytes = totalBytes;
+          this.state = state;
+          this.metadata = metadata;
+          this.task = task;
+          this.ref = ref;
+      }
+      return UploadTaskSnapshot;
+  }());
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @param name Name of the function.
+   * @param specs Argument specs.
+   * @param passed The actual arguments passed to the function.
+   * @throws {fbs.Error} If the arguments are invalid.
+   */
+  function validate(name, specs, passed) {
+      var minArgs = specs.length;
+      var maxArgs = specs.length;
+      for (var i = 0; i < specs.length; i++) {
+          if (specs[i].optional) {
+              minArgs = i;
+              break;
+          }
+      }
+      var validLength = minArgs <= passed.length && passed.length <= maxArgs;
+      if (!validLength) {
+          throw invalidArgumentCount(minArgs, maxArgs, name, passed.length);
+      }
+      for (var i = 0; i < passed.length; i++) {
+          try {
+              specs[i].validator(passed[i]);
+          }
+          catch (e) {
+              if (e instanceof Error) {
+                  throw invalidArgument(i, name, e.message);
+              }
+              else {
+                  throw invalidArgument(i, name, e);
+              }
+          }
+      }
+  }
+  /**
+   * @struct
+   */
+  var ArgSpec = /** @class */ (function () {
+      function ArgSpec(validator, optional) {
+          var self = this;
+          this.validator = function (p) {
+              if (self.optional && !isJustDef(p)) {
+                  return;
+              }
+              validator(p);
+          };
+          this.optional = !!optional;
+      }
+      return ArgSpec;
+  }());
+  function and_(v1, v2) {
+      return function (p) {
+          v1(p);
+          v2(p);
+      };
+  }
+  function stringSpec(validator, optional) {
+      function stringValidator(p) {
+          if (!isString(p)) {
+              throw 'Expected string.';
+          }
+      }
+      var chainedValidator;
+      if (validator) {
+          chainedValidator = and_(stringValidator, validator);
+      }
+      else {
+          chainedValidator = stringValidator;
+      }
+      return new ArgSpec(chainedValidator, optional);
+  }
+  function uploadDataSpec() {
+      function validator(p) {
+          var valid = p instanceof Uint8Array ||
+              p instanceof ArrayBuffer ||
+              (isNativeBlobDefined() && p instanceof Blob);
+          if (!valid) {
+              throw 'Expected Blob or File.';
+          }
+      }
+      return new ArgSpec(validator);
+  }
+  function metadataSpec(optional) {
+      return new ArgSpec(metadataValidator, optional);
+  }
+  function listOptionSpec(optional) {
+      return new ArgSpec(listOptionsValidator, optional);
+  }
+  function nonNegativeNumberSpec() {
+      function validator(p) {
+          var valid = isNumber(p) && p >= 0;
+          if (!valid) {
+              throw 'Expected a number 0 or greater.';
+          }
+      }
+      return new ArgSpec(validator);
+  }
+  function looseObjectSpec(validator, optional) {
+      function isLooseObjectValidator(p) {
+          var isLooseObject = p === null || (isDef(p) && p instanceof Object);
+          if (!isLooseObject) {
+              throw 'Expected an Object.';
+          }
+          if (validator !== undefined && validator !== null) {
+              validator(p);
+          }
+      }
+      return new ArgSpec(isLooseObjectValidator, optional);
+  }
+  function nullFunctionSpec(optional) {
+      function validator(p) {
+          var valid = p === null || isFunction(p);
+          if (!valid) {
+              throw 'Expected a Function.';
+          }
+      }
+      return new ArgSpec(validator, optional);
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * Returns a function that invokes f with its arguments asynchronously as a
+   * microtask, i.e. as soon as possible after the current script returns back
+   * into browser code.
+   */
+  function async(f) {
+      return function () {
+          var argsToForward = [];
+          for (var _i = 0; _i < arguments.length; _i++) {
+              argsToForward[_i] = arguments[_i];
+          }
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          Promise.resolve().then(function () { return f.apply(void 0, argsToForward); });
+      };
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * Represents a blob being uploaded. Can be used to pause/resume/cancel the
+   * upload and manage callbacks for various events.
+   */
+  var UploadTask = /** @class */ (function () {
+      /**
+       * @param ref The firebaseStorage.Reference object this task came
+       *     from, untyped to avoid cyclic dependencies.
+       * @param blob The blob to upload.
+       */
+      function UploadTask(ref, authWrapper, location, mappings, blob, metadata) {
+          var _this = this;
+          if (metadata === void 0) { metadata = null; }
+          this.transferred_ = 0;
+          this.needToFetchStatus_ = false;
+          this.needToFetchMetadata_ = false;
+          this.observers_ = [];
+          this.error_ = null;
+          this.uploadUrl_ = null;
+          this.request_ = null;
+          this.chunkMultiplier_ = 1;
+          this.resolve_ = null;
+          this.reject_ = null;
+          this.ref_ = ref;
+          this.authWrapper_ = authWrapper;
+          this.location_ = location;
+          this.blob_ = blob;
+          this.metadata_ = metadata;
+          this.mappings_ = mappings;
+          this.resumable_ = this.shouldDoResumable_(this.blob_);
+          this.state_ = InternalTaskState.RUNNING;
+          this.errorHandler_ = function (error) {
+              _this.request_ = null;
+              _this.chunkMultiplier_ = 1;
+              if (error.codeEquals(Code.CANCELED)) {
+                  _this.needToFetchStatus_ = true;
+                  _this.completeTransitions_();
+              }
+              else {
+                  _this.error_ = error;
+                  _this.transition_(InternalTaskState.ERROR);
+              }
+          };
+          this.metadataErrorHandler_ = function (error) {
+              _this.request_ = null;
+              if (error.codeEquals(Code.CANCELED)) {
+                  _this.completeTransitions_();
+              }
+              else {
+                  _this.error_ = error;
+                  _this.transition_(InternalTaskState.ERROR);
+              }
+          };
+          this.promise_ = new Promise(function (resolve, reject) {
+              _this.resolve_ = resolve;
+              _this.reject_ = reject;
+              _this.start_();
+          });
+          // Prevent uncaught rejections on the internal promise from bubbling out
+          // to the top level with a dummy handler.
+          this.promise_.then(null, function () { });
+      }
+      UploadTask.prototype.makeProgressCallback_ = function () {
+          var _this = this;
+          var sizeBefore = this.transferred_;
+          return function (loaded) { return _this.updateProgress_(sizeBefore + loaded); };
+      };
+      UploadTask.prototype.shouldDoResumable_ = function (blob) {
+          return blob.size() > 256 * 1024;
+      };
+      UploadTask.prototype.start_ = function () {
+          if (this.state_ !== InternalTaskState.RUNNING) {
+              // This can happen if someone pauses us in a resume callback, for example.
+              return;
+          }
+          if (this.request_ !== null) {
+              return;
+          }
+          if (this.resumable_) {
+              if (this.uploadUrl_ === null) {
+                  this.createResumable_();
+              }
+              else {
+                  if (this.needToFetchStatus_) {
+                      this.fetchStatus_();
+                  }
+                  else {
+                      if (this.needToFetchMetadata_) {
+                          // Happens if we miss the metadata on upload completion.
+                          this.fetchMetadata_();
+                      }
+                      else {
+                          this.continueUpload_();
+                      }
+                  }
+              }
+          }
+          else {
+              this.oneShotUpload_();
+          }
+      };
+      UploadTask.prototype.resolveToken_ = function (callback) {
+          var _this = this;
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          this.authWrapper_.getAuthToken().then(function (authToken) {
+              switch (_this.state_) {
+                  case InternalTaskState.RUNNING:
+                      callback(authToken);
+                      break;
+                  case InternalTaskState.CANCELING:
+                      _this.transition_(InternalTaskState.CANCELED);
+                      break;
+                  case InternalTaskState.PAUSING:
+                      _this.transition_(InternalTaskState.PAUSED);
+                      break;
+              }
+          });
+      };
+      // TODO(andysoto): assert false
+      UploadTask.prototype.createResumable_ = function () {
+          var _this = this;
+          this.resolveToken_(function (authToken) {
+              var requestInfo = createResumableUpload(_this.authWrapper_, _this.location_, _this.mappings_, _this.blob_, _this.metadata_);
+              var createRequest = _this.authWrapper_.makeRequest(requestInfo, authToken);
+              _this.request_ = createRequest;
+              createRequest.getPromise().then(function (url) {
+                  _this.request_ = null;
+                  _this.uploadUrl_ = url;
+                  _this.needToFetchStatus_ = false;
+                  _this.completeTransitions_();
+              }, _this.errorHandler_);
+          });
+      };
+      UploadTask.prototype.fetchStatus_ = function () {
+          var _this = this;
+          // TODO(andysoto): assert(this.uploadUrl_ !== null);
+          var url = this.uploadUrl_;
+          this.resolveToken_(function (authToken) {
+              var requestInfo = getResumableUploadStatus(_this.authWrapper_, _this.location_, url, _this.blob_);
+              var statusRequest = _this.authWrapper_.makeRequest(requestInfo, authToken);
+              _this.request_ = statusRequest;
+              statusRequest.getPromise().then(function (status) {
+                  status = status;
+                  _this.request_ = null;
+                  _this.updateProgress_(status.current);
+                  _this.needToFetchStatus_ = false;
+                  if (status.finalized) {
+                      _this.needToFetchMetadata_ = true;
+                  }
+                  _this.completeTransitions_();
+              }, _this.errorHandler_);
+          });
+      };
+      UploadTask.prototype.continueUpload_ = function () {
+          var _this = this;
+          var chunkSize = resumableUploadChunkSize * this.chunkMultiplier_;
+          var status = new ResumableUploadStatus(this.transferred_, this.blob_.size());
+          // TODO(andysoto): assert(this.uploadUrl_ !== null);
+          var url = this.uploadUrl_;
+          this.resolveToken_(function (authToken) {
+              var requestInfo;
+              try {
+                  requestInfo = continueResumableUpload(_this.location_, _this.authWrapper_, url, _this.blob_, chunkSize, _this.mappings_, status, _this.makeProgressCallback_());
+              }
+              catch (e) {
+                  _this.error_ = e;
+                  _this.transition_(InternalTaskState.ERROR);
+                  return;
+              }
+              var uploadRequest = _this.authWrapper_.makeRequest(requestInfo, authToken);
+              _this.request_ = uploadRequest;
+              uploadRequest
+                  .getPromise()
+                  .then(function (newStatus) {
+                  _this.increaseMultiplier_();
+                  _this.request_ = null;
+                  _this.updateProgress_(newStatus.current);
+                  if (newStatus.finalized) {
+                      _this.metadata_ = newStatus.metadata;
+                      _this.transition_(InternalTaskState.SUCCESS);
+                  }
+                  else {
+                      _this.completeTransitions_();
+                  }
+              }, _this.errorHandler_);
+          });
+      };
+      UploadTask.prototype.increaseMultiplier_ = function () {
+          var currentSize = resumableUploadChunkSize * this.chunkMultiplier_;
+          // Max chunk size is 32M.
+          if (currentSize < 32 * 1024 * 1024) {
+              this.chunkMultiplier_ *= 2;
+          }
+      };
+      UploadTask.prototype.fetchMetadata_ = function () {
+          var _this = this;
+          this.resolveToken_(function (authToken) {
+              var requestInfo = getMetadata(_this.authWrapper_, _this.location_, _this.mappings_);
+              var metadataRequest = _this.authWrapper_.makeRequest(requestInfo, authToken);
+              _this.request_ = metadataRequest;
+              metadataRequest.getPromise().then(function (metadata) {
+                  _this.request_ = null;
+                  _this.metadata_ = metadata;
+                  _this.transition_(InternalTaskState.SUCCESS);
+              }, _this.metadataErrorHandler_);
+          });
+      };
+      UploadTask.prototype.oneShotUpload_ = function () {
+          var _this = this;
+          this.resolveToken_(function (authToken) {
+              var requestInfo = multipartUpload(_this.authWrapper_, _this.location_, _this.mappings_, _this.blob_, _this.metadata_);
+              var multipartRequest = _this.authWrapper_.makeRequest(requestInfo, authToken);
+              _this.request_ = multipartRequest;
+              multipartRequest.getPromise().then(function (metadata) {
+                  _this.request_ = null;
+                  _this.metadata_ = metadata;
+                  _this.updateProgress_(_this.blob_.size());
+                  _this.transition_(InternalTaskState.SUCCESS);
+              }, _this.errorHandler_);
+          });
+      };
+      UploadTask.prototype.updateProgress_ = function (transferred) {
+          var old = this.transferred_;
+          this.transferred_ = transferred;
+          // A progress update can make the "transferred" value smaller (e.g. a
+          // partial upload not completed by server, after which the "transferred"
+          // value may reset to the value at the beginning of the request).
+          if (this.transferred_ !== old) {
+              this.notifyObservers_();
+          }
+      };
+      UploadTask.prototype.transition_ = function (state) {
+          if (this.state_ === state) {
+              return;
+          }
+          switch (state) {
+              case InternalTaskState.CANCELING:
+                  // TODO(andysoto):
+                  // assert(this.state_ === InternalTaskState.RUNNING ||
+                  //        this.state_ === InternalTaskState.PAUSING);
+                  this.state_ = state;
+                  if (this.request_ !== null) {
+                      this.request_.cancel();
+                  }
+                  break;
+              case InternalTaskState.PAUSING:
+                  // TODO(andysoto):
+                  // assert(this.state_ === InternalTaskState.RUNNING);
+                  this.state_ = state;
+                  if (this.request_ !== null) {
+                      this.request_.cancel();
+                  }
+                  break;
+              case InternalTaskState.RUNNING:
+                  // TODO(andysoto):
+                  // assert(this.state_ === InternalTaskState.PAUSED ||
+                  //        this.state_ === InternalTaskState.PAUSING);
+                  var wasPaused = this.state_ === InternalTaskState.PAUSED;
+                  this.state_ = state;
+                  if (wasPaused) {
+                      this.notifyObservers_();
+                      this.start_();
+                  }
+                  break;
+              case InternalTaskState.PAUSED:
+                  // TODO(andysoto):
+                  // assert(this.state_ === InternalTaskState.PAUSING);
+                  this.state_ = state;
+                  this.notifyObservers_();
+                  break;
+              case InternalTaskState.CANCELED:
+                  // TODO(andysoto):
+                  // assert(this.state_ === InternalTaskState.PAUSED ||
+                  //        this.state_ === InternalTaskState.CANCELING);
+                  this.error_ = canceled();
+                  this.state_ = state;
+                  this.notifyObservers_();
+                  break;
+              case InternalTaskState.ERROR:
+                  // TODO(andysoto):
+                  // assert(this.state_ === InternalTaskState.RUNNING ||
+                  //        this.state_ === InternalTaskState.PAUSING ||
+                  //        this.state_ === InternalTaskState.CANCELING);
+                  this.state_ = state;
+                  this.notifyObservers_();
+                  break;
+              case InternalTaskState.SUCCESS:
+                  // TODO(andysoto):
+                  // assert(this.state_ === InternalTaskState.RUNNING ||
+                  //        this.state_ === InternalTaskState.PAUSING ||
+                  //        this.state_ === InternalTaskState.CANCELING);
+                  this.state_ = state;
+                  this.notifyObservers_();
+                  break;
+          }
+      };
+      UploadTask.prototype.completeTransitions_ = function () {
+          switch (this.state_) {
+              case InternalTaskState.PAUSING:
+                  this.transition_(InternalTaskState.PAUSED);
+                  break;
+              case InternalTaskState.CANCELING:
+                  this.transition_(InternalTaskState.CANCELED);
+                  break;
+              case InternalTaskState.RUNNING:
+                  this.start_();
+                  break;
+          }
+      };
+      Object.defineProperty(UploadTask.prototype, "snapshot", {
+          get: function () {
+              var externalState = taskStateFromInternalTaskState(this.state_);
+              return new UploadTaskSnapshot(this.transferred_, this.blob_.size(), externalState, this.metadata_, this, this.ref_);
+          },
+          enumerable: true,
+          configurable: true
+      });
+      /**
+       * Adds a callback for an event.
+       * @param type The type of event to listen for.
+       */
+      UploadTask.prototype.on = function (type, nextOrObserver, error, completed) {
+          function typeValidator() {
+              if (type !== TaskEvent.STATE_CHANGED) {
+                  throw "Expected one of the event types: [" + TaskEvent.STATE_CHANGED + "].";
+              }
+          }
+          var nextOrObserverMessage = 'Expected a function or an Object with one of ' +
+              '`next`, `error`, `complete` properties.';
+          var nextValidator = nullFunctionSpec(true).validator;
+          var observerValidator = looseObjectSpec(null, true).validator;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          function nextOrObserverValidator(p) {
+              try {
+                  nextValidator(p);
+                  return;
+              }
+              catch (e) { }
+              try {
+                  observerValidator(p);
+                  var anyDefined = isJustDef(p['next']) ||
+                      isJustDef(p['error']) ||
+                      isJustDef(p['complete']);
+                  if (!anyDefined) {
+                      throw '';
+                  }
+                  return;
+              }
+              catch (e) {
+                  throw nextOrObserverMessage;
+              }
+          }
+          var specs = [
+              stringSpec(typeValidator),
+              looseObjectSpec(nextOrObserverValidator, true),
+              nullFunctionSpec(true),
+              nullFunctionSpec(true)
+          ];
+          validate('on', specs, arguments);
+          var self = this;
+          function makeBinder(specs) {
+              function binder(nextOrObserver, error, complete) {
+                  if (specs !== null) {
+                      validate('on', specs, arguments);
+                  }
+                  var observer = new Observer(nextOrObserver, error, completed);
+                  self.addObserver_(observer);
+                  return function () {
+                      self.removeObserver_(observer);
+                  };
+              }
+              return binder;
+          }
+          function binderNextOrObserverValidator(p) {
+              if (p === null) {
+                  throw nextOrObserverMessage;
+              }
+              nextOrObserverValidator(p);
+          }
+          var binderSpecs = [
+              looseObjectSpec(binderNextOrObserverValidator),
+              nullFunctionSpec(true),
+              nullFunctionSpec(true)
+          ];
+          var typeOnly = !(isJustDef(nextOrObserver) ||
+              isJustDef(error) ||
+              isJustDef(completed));
+          if (typeOnly) {
+              return makeBinder(binderSpecs);
+          }
+          else {
+              return makeBinder(null)(nextOrObserver, error, completed);
+          }
+      };
+      /**
+       * This object behaves like a Promise, and resolves with its snapshot data
+       * when the upload completes.
+       * @param onFulfilled The fulfillment callback. Promise chaining works as normal.
+       * @param onRejected The rejection callback.
+       */
+      UploadTask.prototype.then = function (onFulfilled, onRejected) {
+          // These casts are needed so that TypeScript can infer the types of the
+          // resulting Promise.
+          return this.promise_.then(onFulfilled, onRejected);
+      };
+      /**
+       * Equivalent to calling `then(null, onRejected)`.
+       */
+      UploadTask.prototype.catch = function (onRejected) {
+          return this.then(null, onRejected);
+      };
+      /**
+       * Adds the given observer.
+       */
+      UploadTask.prototype.addObserver_ = function (observer) {
+          this.observers_.push(observer);
+          this.notifyObserver_(observer);
+      };
+      /**
+       * Removes the given observer.
+       */
+      UploadTask.prototype.removeObserver_ = function (observer) {
+          var i = this.observers_.indexOf(observer);
+          if (i !== -1) {
+              this.observers_.splice(i, 1);
+          }
+      };
+      UploadTask.prototype.notifyObservers_ = function () {
+          var _this = this;
+          this.finishPromise_();
+          var observers = this.observers_.slice();
+          observers.forEach(function (observer) {
+              _this.notifyObserver_(observer);
+          });
+      };
+      UploadTask.prototype.finishPromise_ = function () {
+          if (this.resolve_ !== null) {
+              var triggered = true;
+              switch (taskStateFromInternalTaskState(this.state_)) {
+                  case TaskState.SUCCESS:
+                      async(this.resolve_.bind(null, this.snapshot))();
+                      break;
+                  case TaskState.CANCELED:
+                  case TaskState.ERROR:
+                      var toCall = this.reject_;
+                      async(toCall.bind(null, this.error_))();
+                      break;
+                  default:
+                      triggered = false;
+                      break;
+              }
+              if (triggered) {
+                  this.resolve_ = null;
+                  this.reject_ = null;
+              }
+          }
+      };
+      UploadTask.prototype.notifyObserver_ = function (observer) {
+          var externalState = taskStateFromInternalTaskState(this.state_);
+          switch (externalState) {
+              case TaskState.RUNNING:
+              case TaskState.PAUSED:
+                  if (observer.next) {
+                      async(observer.next.bind(observer, this.snapshot))();
+                  }
+                  break;
+              case TaskState.SUCCESS:
+                  if (observer.complete) {
+                      async(observer.complete.bind(observer))();
+                  }
+                  break;
+              case TaskState.CANCELED:
+              case TaskState.ERROR:
+                  if (observer.error) {
+                      async(observer.error.bind(observer, this.error_))();
+                  }
+                  break;
+              default:
+                  // TODO(andysoto): assert(false);
+                  if (observer.error) {
+                      async(observer.error.bind(observer, this.error_))();
+                  }
+          }
+      };
+      /**
+       * Resumes a paused task. Has no effect on a currently running or failed task.
+       * @return True if the operation took effect, false if ignored.
+       */
+      UploadTask.prototype.resume = function () {
+          validate('resume', [], arguments);
+          var valid = this.state_ === InternalTaskState.PAUSED ||
+              this.state_ === InternalTaskState.PAUSING;
+          if (valid) {
+              this.transition_(InternalTaskState.RUNNING);
+          }
+          return valid;
+      };
+      /**
+       * Pauses a currently running task. Has no effect on a paused or failed task.
+       * @return True if the operation took effect, false if ignored.
+       */
+      UploadTask.prototype.pause = function () {
+          validate('pause', [], arguments);
+          var valid = this.state_ === InternalTaskState.RUNNING;
+          if (valid) {
+              this.transition_(InternalTaskState.PAUSING);
+          }
+          return valid;
+      };
+      /**
+       * Cancels a currently running or paused task. Has no effect on a complete or
+       * failed task.
+       * @return True if the operation took effect, false if ignored.
+       */
+      UploadTask.prototype.cancel = function () {
+          validate('cancel', [], arguments);
+          var valid = this.state_ === InternalTaskState.RUNNING ||
+              this.state_ === InternalTaskState.PAUSING;
+          if (valid) {
+              this.transition_(InternalTaskState.CANCELING);
+          }
+          return valid;
+      };
+      return UploadTask;
+  }());
+
+  /**
+   * @license
+   * Copyright 2019 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * Provides methods to interact with a bucket in the Firebase Storage service.
+   * @param location An fbs.location, or the URL at
+   *     which to base this object, in one of the following forms:
+   *         gs://<bucket>/<object-path>
+   *         http[s]://firebasestorage.googleapis.com/
+   *                     <api-version>/b/<bucket>/o/<object-path>
+   *     Any query or fragment strings will be ignored in the http[s]
+   *     format. If no value is passed, the storage object will use a URL based on
+   *     the project ID of the base firebase.App instance.
+   */
+  var Reference = /** @class */ (function () {
+      function Reference(authWrapper, location) {
+          this.authWrapper = authWrapper;
+          if (location instanceof Location) {
+              this.location = location;
+          }
+          else {
+              this.location = Location.makeFromUrl(location);
+          }
+      }
+      /**
+       * @return The URL for the bucket and path this object references,
+       *     in the form gs://<bucket>/<object-path>
+       * @override
+       */
+      Reference.prototype.toString = function () {
+          validate('toString', [], arguments);
+          return 'gs://' + this.location.bucket + '/' + this.location.path;
+      };
+      Reference.prototype.newRef = function (authWrapper, location) {
+          return new Reference(authWrapper, location);
+      };
+      Reference.prototype.mappings = function () {
+          return getMappings();
+      };
+      /**
+       * @return A reference to the object obtained by
+       *     appending childPath, removing any duplicate, beginning, or trailing
+       *     slashes.
+       */
+      Reference.prototype.child = function (childPath) {
+          validate('child', [stringSpec()], arguments);
+          var newPath = child(this.location.path, childPath);
+          var location = new Location(this.location.bucket, newPath);
+          return this.newRef(this.authWrapper, location);
+      };
+      Object.defineProperty(Reference.prototype, "parent", {
+          /**
+           * @return A reference to the parent of the
+           *     current object, or null if the current object is the root.
+           */
+          get: function () {
+              var newPath = parent(this.location.path);
+              if (newPath === null) {
+                  return null;
+              }
+              var location = new Location(this.location.bucket, newPath);
+              return this.newRef(this.authWrapper, location);
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(Reference.prototype, "root", {
+          /**
+           * @return An reference to the root of this
+           *     object's bucket.
+           */
+          get: function () {
+              var location = new Location(this.location.bucket, '');
+              return this.newRef(this.authWrapper, location);
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(Reference.prototype, "bucket", {
+          get: function () {
+              return this.location.bucket;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(Reference.prototype, "fullPath", {
+          get: function () {
+              return this.location.path;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(Reference.prototype, "name", {
+          get: function () {
+              return lastComponent(this.location.path);
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(Reference.prototype, "storage", {
+          get: function () {
+              return this.authWrapper.service();
+          },
+          enumerable: true,
+          configurable: true
+      });
+      /**
+       * Uploads a blob to this object's location.
+       * @param data The blob to upload.
+       * @return An UploadTask that lets you control and
+       *     observe the upload.
+       */
+      Reference.prototype.put = function (data, metadata) {
+          if (metadata === void 0) { metadata = null; }
+          validate('put', [uploadDataSpec(), metadataSpec(true)], arguments);
+          this.throwIfRoot_('put');
+          return new UploadTask(this, this.authWrapper, this.location, this.mappings(), new FbsBlob(data), metadata);
+      };
+      /**
+       * Uploads a string to this object's location.
+       * @param value The string to upload.
+       * @param format The format of the string to upload.
+       * @return An UploadTask that lets you control and
+       *     observe the upload.
+       */
+      Reference.prototype.putString = function (value, format, metadata) {
+          if (format === void 0) { format = StringFormat.RAW; }
+          validate('putString', [stringSpec(), stringSpec(formatValidator, true), metadataSpec(true)], arguments);
+          this.throwIfRoot_('putString');
+          var data = dataFromString(format, value);
+          var metadataClone = Object.assign({}, metadata);
+          if (!isDef(metadataClone['contentType']) &&
+              isDef(data.contentType)) {
+              metadataClone['contentType'] = data.contentType;
+          }
+          return new UploadTask(this, this.authWrapper, this.location, this.mappings(), new FbsBlob(data.data, true), metadataClone);
+      };
+      /**
+       * Deletes the object at this location.
+       * @return A promise that resolves if the deletion succeeds.
+       */
+      Reference.prototype.delete = function () {
+          var _this = this;
+          validate('delete', [], arguments);
+          this.throwIfRoot_('delete');
+          return this.authWrapper.getAuthToken().then(function (authToken) {
+              var requestInfo = deleteObject(_this.authWrapper, _this.location);
+              return _this.authWrapper.makeRequest(requestInfo, authToken).getPromise();
+          });
+      };
+      /**
+       * List all items (files) and prefixes (folders) under this storage reference.
+       *
+       * This is a helper method for calling list() repeatedly until there are
+       * no more results. The default pagination size is 1000.
+       *
+       * Note: The results may not be consistent if objects are changed while this
+       * operation is running.
+       *
+       * Warning: listAll may potentially consume too many resources if there are
+       * too many results.
+       *
+       * @return A Promise that resolves with all the items and prefixes under
+       *      the current storage reference. `prefixes` contains references to
+       *      sub-directories and `items` contains references to objects in this
+       *      folder. `nextPageToken` is never returned.
+       */
+      Reference.prototype.listAll = function () {
+          validate('listAll', [], arguments);
+          var accumulator = {
+              prefixes: [],
+              items: []
+          };
+          return this.listAllHelper(accumulator).then(function () { return accumulator; });
+      };
+      Reference.prototype.listAllHelper = function (accumulator, pageToken) {
+          return __awaiter(this, void 0, void 0, function () {
+              var opt, nextPage;
+              var _a, _b;
+              return __generator(this, function (_c) {
+                  switch (_c.label) {
+                      case 0:
+                          opt = {
+                              // maxResults is 1000 by default.
+                              pageToken: pageToken
+                          };
+                          return [4 /*yield*/, this.list(opt)];
+                      case 1:
+                          nextPage = _c.sent();
+                          (_a = accumulator.prefixes).push.apply(_a, nextPage.prefixes);
+                          (_b = accumulator.items).push.apply(_b, nextPage.items);
+                          if (!(nextPage.nextPageToken != null)) return [3 /*break*/, 3];
+                          return [4 /*yield*/, this.listAllHelper(accumulator, nextPage.nextPageToken)];
+                      case 2:
+                          _c.sent();
+                          _c.label = 3;
+                      case 3: return [2 /*return*/];
+                  }
+              });
+          });
+      };
+      /**
+       * List items (files) and prefixes (folders) under this storage reference.
+       *
+       * List API is only available for Firebase Rules Version 2.
+       *
+       * GCS is a key-blob store. Firebase Storage imposes the semantic of '/'
+       * delimited folder structure.
+       * Refer to GCS's List API if you want to learn more.
+       *
+       * To adhere to Firebase Rules's Semantics, Firebase Storage does not
+       * support objects whose paths end with "/" or contain two consecutive
+       * "/"s. Firebase Storage List API will filter these unsupported objects.
+       * list() may fail if there are too many unsupported objects in the bucket.
+       *
+       * @param options See ListOptions for details.
+       * @return A Promise that resolves with the items and prefixes.
+       *      `prefixes` contains references to sub-folders and `items`
+       *      contains references to objects in this folder. `nextPageToken`
+       *      can be used to get the rest of the results.
+       */
+      Reference.prototype.list = function (options) {
+          validate('list', [listOptionSpec(true)], arguments);
+          var self = this;
+          return this.authWrapper.getAuthToken().then(function (authToken) {
+              var op = options || {};
+              var requestInfo = list(self.authWrapper, self.location, 
+              /*delimiter= */ '/', op.pageToken, op.maxResults);
+              return self.authWrapper.makeRequest(requestInfo, authToken).getPromise();
+          });
+      };
+      /**
+       *     A promise that resolves with the metadata for this object. If this
+       *     object doesn't exist or metadata cannot be retreived, the promise is
+       *     rejected.
+       */
+      Reference.prototype.getMetadata = function () {
+          var _this = this;
+          validate('getMetadata', [], arguments);
+          this.throwIfRoot_('getMetadata');
+          return this.authWrapper.getAuthToken().then(function (authToken) {
+              var requestInfo = getMetadata(_this.authWrapper, _this.location, _this.mappings());
+              return _this.authWrapper.makeRequest(requestInfo, authToken).getPromise();
+          });
+      };
+      /**
+       * Updates the metadata for this object.
+       * @param metadata The new metadata for the object.
+       *     Only values that have been explicitly set will be changed. Explicitly
+       *     setting a value to null will remove the metadata.
+       * @return A promise that resolves
+       *     with the new metadata for this object.
+       *     @see firebaseStorage.Reference.prototype.getMetadata
+       */
+      Reference.prototype.updateMetadata = function (metadata) {
+          var _this = this;
+          validate('updateMetadata', [metadataSpec()], arguments);
+          this.throwIfRoot_('updateMetadata');
+          return this.authWrapper.getAuthToken().then(function (authToken) {
+              var requestInfo = updateMetadata(_this.authWrapper, _this.location, metadata, _this.mappings());
+              return _this.authWrapper.makeRequest(requestInfo, authToken).getPromise();
+          });
+      };
+      /**
+       * @return A promise that resolves with the download
+       *     URL for this object.
+       */
+      Reference.prototype.getDownloadURL = function () {
+          var _this = this;
+          validate('getDownloadURL', [], arguments);
+          this.throwIfRoot_('getDownloadURL');
+          return this.authWrapper.getAuthToken().then(function (authToken) {
+              var requestInfo = getDownloadUrl(_this.authWrapper, _this.location, _this.mappings());
+              return _this.authWrapper
+                  .makeRequest(requestInfo, authToken)
+                  .getPromise()
+                  .then(function (url) {
+                  if (url === null) {
+                      throw noDownloadURL();
+                  }
+                  return url;
+              });
+          });
+      };
+      Reference.prototype.throwIfRoot_ = function (name) {
+          if (this.location.path === '') {
+              throw invalidRootOperation(name);
+          }
+      };
+      return Reference;
+  }());
+
+  /**
+   * A request whose promise always fails.
+   * @struct
+   * @template T
+   */
+  var FailRequest = /** @class */ (function () {
+      function FailRequest(error) {
+          this.promise_ = Promise.reject(error);
+      }
+      /** @inheritDoc */
+      FailRequest.prototype.getPromise = function () {
+          return this.promise_;
+      };
+      /** @inheritDoc */
+      FailRequest.prototype.cancel = function (_appDelete) {
+      };
+      return FailRequest;
+  }());
+
+  var RequestMap = /** @class */ (function () {
+      function RequestMap() {
+          this.map = new Map();
+          this.id = MIN_SAFE_INTEGER;
+      }
+      /**
+       * Registers the given request with this map.
+       * The request is unregistered when it completes.
+       *
+       * @param request The request to register.
+       */
+      RequestMap.prototype.addRequest = function (request) {
+          var _this = this;
+          var id = this.id;
+          this.id++;
+          this.map.set(id, request);
+          request.getPromise().then(function () { return _this.map.delete(id); }, function () { return _this.map.delete(id); });
+      };
+      /**
+       * Cancels all registered requests.
+       */
+      RequestMap.prototype.clear = function () {
+          this.map.forEach(function (v) {
+              v && v.cancel(true);
+          });
+          this.map.clear();
+      };
+      return RequestMap;
+  }());
+
+  /**
+   * @param app If null, getAuthToken always resolves with null.
+   * @param service The storage service associated with this auth wrapper.
+   *     Untyped to avoid circular type dependencies.
+   * @struct
+   */
+  var AuthWrapper = /** @class */ (function () {
+      function AuthWrapper(app, maker, requestMaker, service, pool) {
+          this.bucket_ = null;
+          this.deleted_ = false;
+          this.app_ = app;
+          if (this.app_ !== null) {
+              var options = this.app_.options;
+              if (isDef(options)) {
+                  this.bucket_ = AuthWrapper.extractBucket_(options);
+              }
+          }
+          this.storageRefMaker_ = maker;
+          this.requestMaker_ = requestMaker;
+          this.pool_ = pool;
+          this.service_ = service;
+          this.maxOperationRetryTime_ = DEFAULT_MAX_OPERATION_RETRY_TIME;
+          this.maxUploadRetryTime_ = DEFAULT_MAX_UPLOAD_RETRY_TIME;
+          this.requestMap_ = new RequestMap();
+      }
+      AuthWrapper.extractBucket_ = function (config) {
+          var bucketString = config[CONFIG_STORAGE_BUCKET_KEY] || null;
+          if (bucketString == null) {
+              return null;
+          }
+          var loc = Location.makeFromBucketSpec(bucketString);
+          return loc.bucket;
+      };
+      AuthWrapper.prototype.getAuthToken = function () {
+          // TODO(andysoto): remove ifDef checks after firebase-app implements stubs
+          // (b/28673818).
+          if (this.app_ !== null &&
+              isDef(this.app_.INTERNAL) &&
+              isDef(this.app_.INTERNAL.getToken)) {
+              return this.app_.INTERNAL.getToken().then(function (response) {
+                  if (response !== null) {
+                      return response.accessToken;
+                  }
+                  else {
+                      return null;
+                  }
+              }, function () { return null; });
+          }
+          else {
+              return Promise.resolve(null);
+          }
+      };
+      AuthWrapper.prototype.bucket = function () {
+          if (this.deleted_) {
+              throw appDeleted();
+          }
+          else {
+              return this.bucket_;
+          }
+      };
+      /**
+       * The service associated with this auth wrapper. Untyped to avoid circular
+       * type dependencies.
+       */
+      AuthWrapper.prototype.service = function () {
+          return this.service_;
+      };
+      /**
+       * Returns a new firebaseStorage.Reference object referencing this AuthWrapper
+       * at the given Location.
+       * @param loc The Location.
+       * @return Actually a firebaseStorage.Reference, typing not allowed
+       *     because of circular dependency problems.
+       */
+      AuthWrapper.prototype.makeStorageReference = function (loc) {
+          return this.storageRefMaker_(this, loc);
+      };
+      AuthWrapper.prototype.makeRequest = function (requestInfo, authToken) {
+          if (!this.deleted_) {
+              var request = this.requestMaker_(requestInfo, authToken, this.pool_);
+              this.requestMap_.addRequest(request);
+              return request;
+          }
+          else {
+              return new FailRequest(appDeleted());
+          }
+      };
+      /**
+       * Stop running requests and prevent more from being created.
+       */
+      AuthWrapper.prototype.deleteApp = function () {
+          this.deleted_ = true;
+          this.app_ = null;
+          this.requestMap_.clear();
+      };
+      AuthWrapper.prototype.maxUploadRetryTime = function () {
+          return this.maxUploadRetryTime_;
+      };
+      AuthWrapper.prototype.setMaxUploadRetryTime = function (time) {
+          this.maxUploadRetryTime_ = time;
+      };
+      AuthWrapper.prototype.maxOperationRetryTime = function () {
+          return this.maxOperationRetryTime_;
+      };
+      AuthWrapper.prototype.setMaxOperationRetryTime = function (time) {
+          this.maxOperationRetryTime_ = time;
+      };
+      return AuthWrapper;
+  }());
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @param f May be invoked
+   *     before the function returns.
+   * @param callback Get all the arguments passed to the function
+   *     passed to f, including the initial boolean.
+   */
+  function start(f, callback, timeout) {
+      // TODO(andysoto): make this code cleaner (probably refactor into an actual
+      // type instead of a bunch of functions with state shared in the closure)
+      var waitSeconds = 1;
+      // Would type this as "number" but that doesn't work for Node so ¯\_(ツ)_/¯
+      // TODO: find a way to exclude Node type definition for storage because storage only works in browser
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      var timeoutId = null;
+      var hitTimeout = false;
+      var cancelState = 0;
+      function canceled() {
+          return cancelState === 2;
+      }
+      var triggeredCallback = false;
+      // TODO: This disable can be removed and the 'ignoreRestArgs' option added to
+      // the no-explicit-any rule when ESlint releases it.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      function triggerCallback() {
+          var args = [];
+          for (var _i = 0; _i < arguments.length; _i++) {
+              args[_i] = arguments[_i];
+          }
+          if (!triggeredCallback) {
+              triggeredCallback = true;
+              callback.apply(null, args);
+          }
+      }
+      function callWithDelay(millis) {
+          timeoutId = setTimeout(function () {
+              timeoutId = null;
+              f(handler, canceled());
+          }, millis);
+      }
+      // TODO: This disable can be removed and the 'ignoreRestArgs' option added to
+      // the no-explicit-any rule when ESlint releases it.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      function handler(success) {
+          var args = [];
+          for (var _i = 1; _i < arguments.length; _i++) {
+              args[_i - 1] = arguments[_i];
+          }
+          if (triggeredCallback) {
+              return;
+          }
+          if (success) {
+              triggerCallback.call.apply(triggerCallback, __spreadArrays([null, success], args));
+              return;
+          }
+          var mustStop = canceled() || hitTimeout;
+          if (mustStop) {
+              triggerCallback.call.apply(triggerCallback, __spreadArrays([null, success], args));
+              return;
+          }
+          if (waitSeconds < 64) {
+              /* TODO(andysoto): don't back off so quickly if we know we're offline. */
+              waitSeconds *= 2;
+          }
+          var waitMillis;
+          if (cancelState === 1) {
+              cancelState = 2;
+              waitMillis = 0;
+          }
+          else {
+              waitMillis = (waitSeconds + Math.random()) * 1000;
+          }
+          callWithDelay(waitMillis);
+      }
+      var stopped = false;
+      function stop(wasTimeout) {
+          if (stopped) {
+              return;
+          }
+          stopped = true;
+          if (triggeredCallback) {
+              return;
+          }
+          if (timeoutId !== null) {
+              if (!wasTimeout) {
+                  cancelState = 2;
+              }
+              clearTimeout(timeoutId);
+              callWithDelay(0);
+          }
+          else {
+              if (!wasTimeout) {
+                  cancelState = 1;
+              }
+          }
+      }
+      callWithDelay(0);
+      setTimeout(function () {
+          hitTimeout = true;
+          stop(true);
+      }, timeout);
+      return stop;
+  }
+  /**
+   * Stops the retry loop from repeating.
+   * If the function is currently "in between" retries, it is invoked immediately
+   * with the second parameter as "true". Otherwise, it will be invoked once more
+   * after the current invocation finishes iff the current invocation would have
+   * triggered another retry.
+   */
+  function stop(id) {
+      id(false);
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * @struct
+   * @template T
+   */
+  var NetworkRequest = /** @class */ (function () {
+      function NetworkRequest(url, method, headers, body, successCodes, additionalRetryCodes, callback, errorCallback, timeout, progressCallback, pool) {
+          var _this = this;
+          this.pendingXhr_ = null;
+          this.backoffId_ = null;
+          this.resolve_ = null;
+          this.reject_ = null;
+          this.canceled_ = false;
+          this.appDelete_ = false;
+          this.url_ = url;
+          this.method_ = method;
+          this.headers_ = headers;
+          this.body_ = body;
+          this.successCodes_ = successCodes.slice();
+          this.additionalRetryCodes_ = additionalRetryCodes.slice();
+          this.callback_ = callback;
+          this.errorCallback_ = errorCallback;
+          this.progressCallback_ = progressCallback;
+          this.timeout_ = timeout;
+          this.pool_ = pool;
+          this.promise_ = new Promise(function (resolve, reject) {
+              _this.resolve_ = resolve;
+              _this.reject_ = reject;
+              _this.start_();
+          });
+      }
+      /**
+       * Actually starts the retry loop.
+       */
+      NetworkRequest.prototype.start_ = function () {
+          var self = this;
+          function doTheRequest(backoffCallback, canceled) {
+              if (canceled) {
+                  backoffCallback(false, new RequestEndStatus(false, null, true));
+                  return;
+              }
+              var xhr = self.pool_.createXhrIo();
+              self.pendingXhr_ = xhr;
+              function progressListener(progressEvent) {
+                  var loaded = progressEvent.loaded;
+                  var total = progressEvent.lengthComputable ? progressEvent.total : -1;
+                  if (self.progressCallback_ !== null) {
+                      self.progressCallback_(loaded, total);
+                  }
+              }
+              if (self.progressCallback_ !== null) {
+                  xhr.addUploadProgressListener(progressListener);
+              }
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              xhr
+                  .send(self.url_, self.method_, self.body_, self.headers_)
+                  .then(function (xhr) {
+                  if (self.progressCallback_ !== null) {
+                      xhr.removeUploadProgressListener(progressListener);
+                  }
+                  self.pendingXhr_ = null;
+                  xhr = xhr;
+                  var hitServer = xhr.getErrorCode() === ErrorCode.NO_ERROR;
+                  var status = xhr.getStatus();
+                  if (!hitServer || self.isRetryStatusCode_(status)) {
+                      var wasCanceled = xhr.getErrorCode() === ErrorCode.ABORT;
+                      backoffCallback(false, new RequestEndStatus(false, null, wasCanceled));
+                      return;
+                  }
+                  var successCode = self.successCodes_.indexOf(status) !== -1;
+                  backoffCallback(true, new RequestEndStatus(successCode, xhr));
+              });
+          }
+          /**
+           * @param requestWentThrough True if the request eventually went
+           *     through, false if it hit the retry limit or was canceled.
+           */
+          function backoffDone(requestWentThrough, status) {
+              var resolve = self.resolve_;
+              var reject = self.reject_;
+              var xhr = status.xhr;
+              if (status.wasSuccessCode) {
+                  try {
+                      var result = self.callback_(xhr, xhr.getResponseText());
+                      if (isJustDef(result)) {
+                          resolve(result);
+                      }
+                      else {
+                          resolve();
+                      }
+                  }
+                  catch (e) {
+                      reject(e);
+                  }
+              }
+              else {
+                  if (xhr !== null) {
+                      var err = unknown();
+                      err.setServerResponseProp(xhr.getResponseText());
+                      if (self.errorCallback_) {
+                          reject(self.errorCallback_(xhr, err));
+                      }
+                      else {
+                          reject(err);
+                      }
+                  }
+                  else {
+                      if (status.canceled) {
+                          var err = self.appDelete_ ? appDeleted() : canceled();
+                          reject(err);
+                      }
+                      else {
+                          var err = retryLimitExceeded();
+                          reject(err);
+                      }
+                  }
+              }
+          }
+          if (this.canceled_) {
+              backoffDone(false, new RequestEndStatus(false, null, true));
+          }
+          else {
+              this.backoffId_ = start(doTheRequest, backoffDone, this.timeout_);
+          }
+      };
+      /** @inheritDoc */
+      NetworkRequest.prototype.getPromise = function () {
+          return this.promise_;
+      };
+      /** @inheritDoc */
+      NetworkRequest.prototype.cancel = function (appDelete) {
+          this.canceled_ = true;
+          this.appDelete_ = appDelete || false;
+          if (this.backoffId_ !== null) {
+              stop(this.backoffId_);
+          }
+          if (this.pendingXhr_ !== null) {
+              this.pendingXhr_.abort();
+          }
+      };
+      NetworkRequest.prototype.isRetryStatusCode_ = function (status) {
+          // The codes for which to retry came from this page:
+          // https://cloud.google.com/storage/docs/exponential-backoff
+          var isFiveHundredCode = status >= 500 && status < 600;
+          var extraRetryCodes = [
+              // Request Timeout: web server didn't receive full request in time.
+              408,
+              // Too Many Requests: you're getting rate-limited, basically.
+              429
+          ];
+          var isExtraRetryCode = extraRetryCodes.indexOf(status) !== -1;
+          var isRequestSpecificRetryCode = this.additionalRetryCodes_.indexOf(status) !== -1;
+          return isFiveHundredCode || isExtraRetryCode || isRequestSpecificRetryCode;
+      };
+      return NetworkRequest;
+  }());
+  /**
+   * A collection of information about the result of a network request.
+   * @param opt_canceled Defaults to false.
+   * @struct
+   */
+  var RequestEndStatus = /** @class */ (function () {
+      function RequestEndStatus(wasSuccessCode, xhr, canceled) {
+          this.wasSuccessCode = wasSuccessCode;
+          this.xhr = xhr;
+          this.canceled = !!canceled;
+      }
+      return RequestEndStatus;
+  }());
+  function addAuthHeader_(headers, authToken) {
+      if (authToken !== null && authToken.length > 0) {
+          headers['Authorization'] = 'Firebase ' + authToken;
+      }
+  }
+  function addVersionHeader_(headers) {
+      var version = typeof firebase !== 'undefined' ? firebase.SDK_VERSION : 'AppManager';
+      headers['X-Firebase-Storage-Version'] = 'webjs/' + version;
+  }
+  /**
+   * @template T
+   */
+  function makeRequest(requestInfo, authToken, pool) {
+      var queryPart = makeQueryString(requestInfo.urlParams);
+      var url = requestInfo.url + queryPart;
+      var headers = Object.assign({}, requestInfo.headers);
+      addAuthHeader_(headers, authToken);
+      addVersionHeader_(headers);
+      return new NetworkRequest(url, requestInfo.method, headers, requestInfo.body, requestInfo.successCodes, requestInfo.additionalRetryCodes, requestInfo.handler, requestInfo.errorHandler, requestInfo.timeout, requestInfo.progressCallback, pool);
+  }
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * A service that provides firebaseStorage.Reference instances.
+   * @param opt_url gs:// url to a custom Storage Bucket
+   *
+   * @struct
+   */
+  var Service = /** @class */ (function () {
+      function Service(app, pool, url) {
+          this.bucket_ = null;
+          function maker(authWrapper, loc) {
+              return new Reference(authWrapper, loc);
+          }
+          this.authWrapper_ = new AuthWrapper(app, maker, makeRequest, this, pool);
+          this.app_ = app;
+          if (url != null) {
+              this.bucket_ = Location.makeFromBucketSpec(url);
+          }
+          else {
+              var authWrapperBucket = this.authWrapper_.bucket();
+              if (authWrapperBucket != null) {
+                  this.bucket_ = new Location(authWrapperBucket, '');
+              }
+          }
+          this.internals_ = new ServiceInternals(this);
+      }
+      /**
+       * Returns a firebaseStorage.Reference for the given path in the default
+       * bucket.
+       */
+      Service.prototype.ref = function (path) {
+          function validator(path) {
+              if (typeof path !== 'string') {
+                  throw 'Path is not a string.';
+              }
+              if (/^[A-Za-z]+:\/\//.test(path)) {
+                  throw 'Expected child path but got a URL, use refFromURL instead.';
+              }
+          }
+          validate('ref', [stringSpec(validator, true)], arguments);
+          if (this.bucket_ == null) {
+              throw new Error('No Storage Bucket defined in Firebase Options.');
+          }
+          var ref = new Reference(this.authWrapper_, this.bucket_);
+          if (path != null) {
+              return ref.child(path);
+          }
+          else {
+              return ref;
+          }
+      };
+      /**
+       * Returns a firebaseStorage.Reference object for the given absolute URL,
+       * which must be a gs:// or http[s]:// URL.
+       */
+      Service.prototype.refFromURL = function (url) {
+          function validator(p) {
+              if (typeof p !== 'string') {
+                  throw 'Path is not a string.';
+              }
+              if (!/^[A-Za-z]+:\/\//.test(p)) {
+                  throw 'Expected full URL but got a child path, use ref instead.';
+              }
+              try {
+                  Location.makeFromUrl(p);
+              }
+              catch (e) {
+                  throw 'Expected valid full URL but got an invalid one.';
+              }
+          }
+          validate('refFromURL', [stringSpec(validator, false)], arguments);
+          return new Reference(this.authWrapper_, url);
+      };
+      Object.defineProperty(Service.prototype, "maxUploadRetryTime", {
+          get: function () {
+              return this.authWrapper_.maxUploadRetryTime();
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Service.prototype.setMaxUploadRetryTime = function (time) {
+          validate('setMaxUploadRetryTime', [nonNegativeNumberSpec()], arguments);
+          this.authWrapper_.setMaxUploadRetryTime(time);
+      };
+      Service.prototype.setMaxOperationRetryTime = function (time) {
+          validate('setMaxOperationRetryTime', [nonNegativeNumberSpec()], arguments);
+          this.authWrapper_.setMaxOperationRetryTime(time);
+      };
+      Object.defineProperty(Service.prototype, "app", {
+          get: function () {
+              return this.app_;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      Object.defineProperty(Service.prototype, "INTERNAL", {
+          get: function () {
+              return this.internals_;
+          },
+          enumerable: true,
+          configurable: true
+      });
+      return Service;
+  }());
+  /**
+   * @struct
+   */
+  var ServiceInternals = /** @class */ (function () {
+      function ServiceInternals(service) {
+          this.service_ = service;
+      }
+      /**
+       * Called when the associated app is deleted.
+       * @see {!fbs.AuthWrapper.prototype.deleteApp}
+       */
+      ServiceInternals.prototype.delete = function () {
+          this.service_.authWrapper_.deleteApp();
+          return Promise.resolve();
+      };
+      return ServiceInternals;
+  }());
+
+  /**
+   * @license
+   * Copyright 2017 Google Inc.
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+  /**
+   * Type constant for Firebase Storage.
+   */
+  var STORAGE_TYPE = 'storage';
+  function factory(app, unused, url) {
+      return new Service(app, new XhrIoPool(), url);
+  }
+  function registerStorage(instance) {
+      var namespaceExports = {
+          // no-inline
+          TaskState: TaskState,
+          TaskEvent: TaskEvent,
+          StringFormat: StringFormat,
+          Storage: Service,
+          Reference: Reference
+      };
+      instance.INTERNAL.registerService(STORAGE_TYPE, factory, namespaceExports, undefined, 
+      // Allow multiple storage instances per app.
+      true);
+  }
+  registerStorage(firebase);
 
   var firebaseConfig = {
     apiKey: 'AIzaSyBSDQTQrnklilGdmyZcEXMGhIwg0dFpNlY',
@@ -30919,9 +34612,56 @@ var app = (function () {
     appId: '1:456731753647:web:079b4e850e4c03f2e1a85a'
   }; // Initialize firebase
 
-  index_cjs$2.initializeApp(firebaseConfig); // Export globals for use elsewhere in the app
+  index_cjs$2.initializeApp(firebaseConfig); // Export firebase globals for use elsewhere in the app
 
   var db$1 = index_cjs$2.firestore();
+  var storage = index_cjs$2.storage(); // Functions to parse the URL to get workerID, hitID, and assignmentID
+
+  var unescapeURL = function unescapeURL(s) {
+    return decodeURIComponent(s.replace(/\+/g, '%20'));
+  };
+
+  var getURLParams = function getURLParams() {
+    var params = {};
+    var m = window.location.href.match(/[\\?&]([^=]+)=([^&#]*)/g);
+
+    if (m) {
+      var i = 0;
+
+      while (i < m.length) {
+        var a = m[i].match(/.([^=]+)=(.*)/);
+        params[unescapeURL(a[1])] = unescapeURL(a[2]);
+        i += 1;
+      }
+    }
+
+    if (!params.workerId && !params.assignmentId && !params.hitId) {
+      params.workerId = 'test-worker';
+      params.assignmentId = 'test-assignment';
+      params.hitId = 'test-hit';
+    }
+
+    return params;
+  }; // Shuffle array elements inplace: https://javascript.info/task/shuffle
+
+
+  var fisherYatesShuffle = function fisherYatesShuffle(array) {
+    for (var i = array.length - 1; i > 0; i -= 1) {
+      var j = Math.floor(Math.random() * (i + 1)); // random index from 0 to i
+      // swap elements array[i] and array[j]
+      // we use "destructuring assignment" syntax to achieve that
+      // you'll find more details about that syntax in later chapters
+      // same can be written as:
+      // let t = array[i]; array[i] = array[j]; array[j] = t
+      // eslint-disable-next-line no-param-reassign
+
+      var _ref = [array[j], array[i]];
+      array[i] = _ref[0];
+      array[j] = _ref[1];
+    }
+  }; // Get the window URL params and make them available throughout the app
+
+  var params = getURLParams();
 
   var file = "src/pages/Instructions.svelte"; // (72:14) {:else}
 
@@ -47625,7 +51365,7 @@ var app = (function () {
   }();
   },{}]},{},[70])(70)
   });
-  //# sourceMappingURL=peaks.js.map
+
   });
 
   var Peaks = unwrapExports(peaks);
@@ -47638,7 +51378,34 @@ var app = (function () {
     child_ctx.segment = list[i];
     child_ctx.i = i;
     return child_ctx;
-  } // (211:6) {:else}
+  } // (176:6) {#if peaksLoading}
+
+
+  function create_if_block_1(ctx) {
+    var h3;
+    var block = {
+      c: function create() {
+        h3 = element("h3");
+        h3.textContent = "Loading audio...";
+        attr_dev(h3, "class", "title is-3");
+        add_location(h3, file$1, 176, 8, 5987);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, h3, anchor);
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(h3);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block_1.name,
+      type: "if",
+      source: "(176:6) {#if peaksLoading}",
+      ctx: ctx
+    });
+    return block;
+  } // (234:6) {:else}
 
 
   function create_else_block$1(ctx) {
@@ -47648,7 +51415,7 @@ var app = (function () {
         h2 = element("h2");
         h2.textContent = "No Thoughts Tagged";
         attr_dev(h2, "class", "title is-4");
-        add_location(h2, file$1, 211, 8, 7331);
+        add_location(h2, file$1, 234, 8, 8115);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h2, anchor);
@@ -47662,11 +51429,11 @@ var app = (function () {
       block: block,
       id: create_else_block$1.name,
       type: "else",
-      source: "(211:6) {:else}",
+      source: "(234:6) {:else}",
       ctx: ctx
     });
     return block;
-  } // (188:6) {#if segments && segments.length}
+  } // (211:6) {#if segments && segments.length}
 
 
   function create_if_block$1(ctx) {
@@ -47716,16 +51483,16 @@ var app = (function () {
           each_blocks[_i].c();
         }
 
-        add_location(th0, file$1, 192, 16, 6656);
-        add_location(th1, file$1, 193, 16, 6696);
-        add_location(th2, file$1, 194, 16, 6732);
-        add_location(tr, file$1, 191, 14, 6635);
-        add_location(thead, file$1, 190, 12, 6613);
-        add_location(tbody, file$1, 197, 12, 6803);
+        add_location(th0, file$1, 215, 16, 7440);
+        add_location(th1, file$1, 216, 16, 7480);
+        add_location(th2, file$1, 217, 16, 7516);
+        add_location(tr, file$1, 214, 14, 7419);
+        add_location(thead, file$1, 213, 12, 7397);
+        add_location(tbody, file$1, 220, 12, 7587);
         attr_dev(table, "class", "table is-hoverable svelte-8nkdb");
-        add_location(table, file$1, 189, 10, 6566);
+        add_location(table, file$1, 212, 10, 7350);
         attr_dev(div, "class", "table-container");
-        add_location(div, file$1, 188, 8, 6526);
+        add_location(div, file$1, 211, 8, 7310);
       },
       m: function mount(target, anchor) {
         insert_dev(target, div, anchor);
@@ -47760,11 +51527,11 @@ var app = (function () {
       block: block,
       id: create_if_block$1.name,
       type: "if",
-      source: "(188:6) {#if segments && segments.length}",
+      source: "(211:6) {#if segments && segments.length}",
       ctx: ctx
     });
     return block;
-  } // (199:14) {#each segments as segment, i (segment.id)}
+  } // (222:14) {#each segments as segment, i (segment.id)}
 
 
   function create_each_block(key_1, ctx) {
@@ -47798,13 +51565,13 @@ var app = (function () {
         t5 = space();
         attr_dev(td0, "type", "text");
         attr_dev(td0, "class", "segment-id");
-        add_location(td0, file$1, 200, 18, 6951);
+        add_location(td0, file$1, 223, 18, 7735);
         attr_dev(td1, "type", "number");
-        add_location(td1, file$1, 203, 18, 7086);
+        add_location(td1, file$1, 226, 18, 7870);
         attr_dev(td2, "type", "number");
-        add_location(td2, file$1, 204, 18, 7158);
+        add_location(td2, file$1, 227, 18, 7942);
         attr_dev(tr, "class", "table-row");
-        add_location(tr, file$1, 199, 16, 6885);
+        add_location(tr, file$1, 222, 16, 7669);
         dispose = listen_dev(tr, "click", ctx.selectSegment, false, false, false);
         this.first = tr;
       },
@@ -47834,7 +51601,7 @@ var app = (function () {
       block: block,
       id: create_each_block.name,
       type: "each",
-      source: "(199:14) {#each segments as segment, i (segment.id)}",
+      source: "(222:14) {#each segments as segment, i (segment.id)}",
       ctx: ctx
     });
     return block;
@@ -47848,31 +51615,33 @@ var app = (function () {
     var t0;
     var t1;
     var t2;
-    var div0;
     var t3;
+    var div0;
+    var t4;
     var div3;
     var div1;
     var audio;
     var source;
     var source_src_value;
-    var t4;
     var t5;
+    var t6;
     var div2;
     var button0;
-    var t7;
+    var t8;
     var button1;
-    var t9;
-    var button2;
     var t10;
-    var button2_class_value;
+    var button2;
     var t11;
-    var button3;
+    var button2_class_value;
     var t12;
-    var button3_class_value;
+    var button3;
     var t13;
+    var button3_class_value;
+    var t14;
     var div7;
     var div6;
     var dispose;
+    var if_block0 = ctx.peaksLoading && create_if_block_1(ctx);
 
     function select_block_type(changed, ctx) {
       if (ctx.segments && ctx.segments.length) return create_if_block$1;
@@ -47880,7 +51649,7 @@ var app = (function () {
     }
 
     var current_block_type = select_block_type(null, ctx);
-    var if_block = current_block_type(ctx);
+    var if_block1 = current_block_type(ctx);
     var block = {
       c: function create() {
         div8 = element("div");
@@ -47888,66 +51657,68 @@ var app = (function () {
         div4 = element("div");
         h1 = element("h1");
         t0 = text("Recording #");
-        t1 = text(ctx.trialNumber);
+        t1 = text(ctx.currentTrial);
         t2 = space();
-        div0 = element("div");
+        if (if_block0) if_block0.c();
         t3 = space();
+        div0 = element("div");
+        t4 = space();
         div3 = element("div");
         div1 = element("div");
         audio = element("audio");
         source = element("source");
-        t4 = text("\n            Your browser does not support the audio element.");
-        t5 = space();
+        t5 = text("\n            Your browser does not support the audio element.");
+        t6 = space();
         div2 = element("div");
         button0 = element("button");
         button0.textContent = "Tag Thought";
-        t7 = space();
+        t8 = space();
         button1 = element("button");
         button1.textContent = "Finished";
-        t9 = space();
+        t10 = space();
         button2 = element("button");
-        t10 = text("Play Thought");
-        t11 = space();
+        t11 = text("Play Thought");
+        t12 = space();
         button3 = element("button");
-        t12 = text("Delete Segment");
-        t13 = space();
+        t13 = text("Delete Segment");
+        t14 = space();
         div7 = element("div");
         div6 = element("div");
-        if_block.c();
+        if_block1.c();
         attr_dev(h1, "class", "title");
-        add_location(h1, file$1, 154, 6, 5212);
+        add_location(h1, file$1, 174, 6, 5905);
         attr_dev(div0, "id", "waveform-container");
-        add_location(div0, file$1, 155, 6, 5266);
+        add_location(div0, file$1, 178, 6, 6050);
         if (source.src !== (source_src_value = ctx.src)) attr_dev(source, "src", source_src_value);
         attr_dev(source, "type", "audio/wav");
-        add_location(source, file$1, 159, 12, 5431);
+        add_location(source, file$1, 182, 12, 6215);
         attr_dev(audio, "id", "audio");
         audio.controls = "controls";
-        add_location(audio, file$1, 158, 10, 5380);
+        add_location(audio, file$1, 181, 10, 6164);
         attr_dev(div1, "class", "column is-one-quarter");
-        add_location(div1, file$1, 157, 8, 5334);
+        add_location(div1, file$1, 180, 8, 6118);
         attr_dev(button0, "class", "button is-primary is-large");
-        add_location(button0, file$1, 164, 10, 5611);
+        add_location(button0, file$1, 187, 10, 6395);
         attr_dev(button1, "class", "button is-info is-large");
-        add_location(button1, file$1, 167, 10, 5731);
+        add_location(button1, file$1, 190, 10, 6515);
         attr_dev(button2, "class", button2_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-success is-large" : "button is-success is-large hidden") + " svelte-8nkdb"));
-        add_location(button2, file$1, 170, 10, 5841);
+        add_location(button2, file$1, 193, 10, 6625);
         attr_dev(button3, "class", button3_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-danger is-large" : "button is-danger is-large hidden") + " svelte-8nkdb"));
-        add_location(button3, file$1, 175, 10, 6041);
+        add_location(button3, file$1, 198, 10, 6825);
         attr_dev(div2, "class", "column is-one-half");
-        add_location(div2, file$1, 163, 8, 5568);
+        add_location(div2, file$1, 186, 8, 6352);
         attr_dev(div3, "class", "columns");
-        add_location(div3, file$1, 156, 6, 5304);
+        add_location(div3, file$1, 179, 6, 6088);
         attr_dev(div4, "class", "column is-three-quarters");
-        add_location(div4, file$1, 153, 4, 5167);
+        add_location(div4, file$1, 173, 4, 5860);
         attr_dev(div5, "class", "columns is-centered");
-        add_location(div5, file$1, 152, 2, 5129);
+        add_location(div5, file$1, 172, 2, 5822);
         attr_dev(div6, "class", "column is-three-quarters has-text-centered");
-        add_location(div6, file$1, 186, 4, 6421);
+        add_location(div6, file$1, 209, 4, 7205);
         attr_dev(div7, "class", "columns is-centered");
-        add_location(div7, file$1, 185, 2, 6383);
+        add_location(div7, file$1, 208, 2, 7167);
         attr_dev(div8, "class", "container");
-        add_location(div8, file$1, 151, 0, 5103);
+        add_location(div8, file$1, 171, 0, 5796);
         dispose = [listen_dev(button0, "click", ctx.addSegment, false, false, false), listen_dev(button1, "click", ctx.finish, false, false, false), listen_dev(button2, "click", ctx.playSegment, false, false, false), listen_dev(button3, "click", ctx.deleteSegment, false, false, false)];
       },
       l: function claim(nodes) {
@@ -47961,31 +51732,44 @@ var app = (function () {
         append_dev(h1, t0);
         append_dev(h1, t1);
         append_dev(div4, t2);
-        append_dev(div4, div0);
+        if (if_block0) if_block0.m(div4, null);
         append_dev(div4, t3);
+        append_dev(div4, div0);
+        append_dev(div4, t4);
         append_dev(div4, div3);
         append_dev(div3, div1);
         append_dev(div1, audio);
         append_dev(audio, source);
-        append_dev(audio, t4);
-        append_dev(div3, t5);
+        append_dev(audio, t5);
+        append_dev(div3, t6);
         append_dev(div3, div2);
         append_dev(div2, button0);
-        append_dev(div2, t7);
+        append_dev(div2, t8);
         append_dev(div2, button1);
-        append_dev(div2, t9);
+        append_dev(div2, t10);
         append_dev(div2, button2);
-        append_dev(button2, t10);
-        append_dev(div2, t11);
+        append_dev(button2, t11);
+        append_dev(div2, t12);
         append_dev(div2, button3);
-        append_dev(button3, t12);
-        append_dev(div8, t13);
+        append_dev(button3, t13);
+        append_dev(div8, t14);
         append_dev(div8, div7);
         append_dev(div7, div6);
-        if_block.m(div6, null);
+        if_block1.m(div6, null);
       },
       p: function update(changed, ctx) {
-        if (changed.trialNumber) set_data_dev(t1, ctx.trialNumber);
+        if (changed.currentTrial) set_data_dev(t1, ctx.currentTrial);
+
+        if (ctx.peaksLoading) {
+          if (!if_block0) {
+            if_block0 = create_if_block_1(ctx);
+            if_block0.c();
+            if_block0.m(div4, t3);
+          }
+        } else if (if_block0) {
+          if_block0.d(1);
+          if_block0 = null;
+        }
 
         if (changed.src && source.src !== (source_src_value = ctx.src)) {
           attr_dev(source, "src", source_src_value);
@@ -47999,15 +51783,15 @@ var app = (function () {
           attr_dev(button3, "class", button3_class_value);
         }
 
-        if (current_block_type === (current_block_type = select_block_type(changed, ctx)) && if_block) {
-          if_block.p(changed, ctx);
+        if (current_block_type === (current_block_type = select_block_type(changed, ctx)) && if_block1) {
+          if_block1.p(changed, ctx);
         } else {
-          if_block.d(1);
-          if_block = current_block_type(ctx);
+          if_block1.d(1);
+          if_block1 = current_block_type(ctx);
 
-          if (if_block) {
-            if_block.c();
-            if_block.m(div6, null);
+          if (if_block1) {
+            if_block1.c();
+            if_block1.m(div6, null);
           }
         }
       },
@@ -48015,7 +51799,8 @@ var app = (function () {
       o: noop,
       d: function destroy(detaching) {
         if (detaching) detach_dev(div8);
-        if_block.d();
+        if (if_block0) if_block0.d();
+        if_block1.d();
         run_all(dispose);
       }
     };
@@ -48031,13 +51816,26 @@ var app = (function () {
 
   function instance$1($$self, $$props, $$invalidate) {
     var src = $$props.src;
-    var trialNumber = $$props.trialNumber;
+    var currentTrial = $$props.currentTrial;
+    var fileName = $$props.fileName;
+
+    var _fileName$split = fileName.split("_"),
+        _fileName$split2 = _slicedToArray(_fileName$split, 2),
+        subjectId = _fileName$split2[0],
+        character = _fileName$split2[1];
+
+    var _character$split = character.split("_");
+
+    var _character$split2 = _slicedToArray(_character$split, 1);
+
+    character = _character$split2[0];
     var peaksInstance;
     var segments = [];
     var selectedSegmentId;
     var rowSelected = false;
     var segmentPrevMax = 0;
     var dispatch = createEventDispatcher();
+    var peaksLoading = true;
     onMount(function () {
       var options = {
         container: document.getElementById("waveform-container"),
@@ -48055,6 +51853,7 @@ var app = (function () {
         if (err) {
           console.error(err);
         } else {
+          $$invalidate("peaksLoading", peaksLoading = false);
           console.log("Peaks instance ready");
           $$invalidate("segments", segments = peaksInstance.segments.getSegments());
         }
@@ -48070,9 +51869,65 @@ var app = (function () {
       });
     });
 
-    function finish() {
-      dispatch("next");
-    }
+    var finish = function finish() {
+      var _doc, toSave, doc;
+
+      return regeneratorRuntime.async(function finish$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              if (!segments) {
+                _context.next = 19;
+                break;
+              }
+
+              if (!(segments.length < 2)) {
+                _context.next = 5;
+                break;
+              }
+
+              alert("Please tag a few more thoughts");
+              _context.next = 19;
+              break;
+
+            case 5:
+              toSave = {};
+              segments.forEach(function (obj) {
+                toSave[obj._id] = {
+                  startTime: obj._startTime,
+                  endTime: obj._endTime
+                };
+              });
+              doc = (_doc = {}, _defineProperty(_doc, "trial_".concat(currentTrial), {
+                subject: subjectId,
+                character: character,
+                thoughts: toSave
+              }), _defineProperty(_doc, "currentTrial", currentTrial + 1), _doc);
+              _context.prev = 8;
+              _context.next = 11;
+              return regeneratorRuntime.awrap(db$1.collection("participants").doc(params.workerId).set(doc, {
+                merge: true
+              }));
+
+            case 11:
+              console.log("document added successfully");
+              peaksInstance.destroy();
+              dispatch("next");
+              _context.next = 19;
+              break;
+
+            case 16:
+              _context.prev = 16;
+              _context.t0 = _context["catch"](8);
+              console.error(_context.t0);
+
+            case 19:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, null, null, [[8, 16]]);
+    };
 
     function addSegment() {
       peaksInstance.segments.add({
@@ -48184,43 +52039,54 @@ var app = (function () {
       $$invalidate("segments", segments = peaksInstance.segments.getSegments());
     }
 
-    var writable_props = ["src", "trialNumber"];
+    var writable_props = ["src", "currentTrial", "fileName"];
     Object.keys($$props).forEach(function (key) {
       if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1.warn("<TagThought> was created with unknown prop '".concat(key, "'"));
     });
 
     $$self.$set = function ($$props) {
       if ("src" in $$props) $$invalidate("src", src = $$props.src);
-      if ("trialNumber" in $$props) $$invalidate("trialNumber", trialNumber = $$props.trialNumber);
+      if ("currentTrial" in $$props) $$invalidate("currentTrial", currentTrial = $$props.currentTrial);
+      if ("fileName" in $$props) $$invalidate("fileName", fileName = $$props.fileName);
     };
 
     $$self.$capture_state = function () {
       return {
         src: src,
-        trialNumber: trialNumber,
+        currentTrial: currentTrial,
+        fileName: fileName,
+        subjectId: subjectId,
+        character: character,
         peaksInstance: peaksInstance,
         segments: segments,
         selectedSegmentId: selectedSegmentId,
         rowSelected: rowSelected,
-        segmentPrevMax: segmentPrevMax
+        segmentPrevMax: segmentPrevMax,
+        peaksLoading: peaksLoading
       };
     };
 
     $$self.$inject_state = function ($$props) {
       if ("src" in $$props) $$invalidate("src", src = $$props.src);
-      if ("trialNumber" in $$props) $$invalidate("trialNumber", trialNumber = $$props.trialNumber);
+      if ("currentTrial" in $$props) $$invalidate("currentTrial", currentTrial = $$props.currentTrial);
+      if ("fileName" in $$props) $$invalidate("fileName", fileName = $$props.fileName);
+      if ("subjectId" in $$props) subjectId = $$props.subjectId;
+      if ("character" in $$props) character = $$props.character;
       if ("peaksInstance" in $$props) peaksInstance = $$props.peaksInstance;
       if ("segments" in $$props) $$invalidate("segments", segments = $$props.segments);
       if ("selectedSegmentId" in $$props) selectedSegmentId = $$props.selectedSegmentId;
       if ("rowSelected" in $$props) $$invalidate("rowSelected", rowSelected = $$props.rowSelected);
       if ("segmentPrevMax" in $$props) segmentPrevMax = $$props.segmentPrevMax;
+      if ("peaksLoading" in $$props) $$invalidate("peaksLoading", peaksLoading = $$props.peaksLoading);
     };
 
     return {
       src: src,
-      trialNumber: trialNumber,
+      currentTrial: currentTrial,
+      fileName: fileName,
       segments: segments,
       rowSelected: rowSelected,
+      peaksLoading: peaksLoading,
       finish: finish,
       addSegment: addSegment,
       selectSegment: selectSegment,
@@ -48242,7 +52108,8 @@ var app = (function () {
       _this = _possibleConstructorReturn(this, _getPrototypeOf(TagThought).call(this, options));
       init(_assertThisInitialized(_this), options, instance$1, create_fragment$1, safe_not_equal, {
         src: 0,
-        trialNumber: 0
+        currentTrial: 0,
+        fileName: 0
       });
       dispatch_dev("SvelteRegisterComponent", {
         component: _assertThisInitialized(_this),
@@ -48257,8 +52124,12 @@ var app = (function () {
         console_1.warn("<TagThought> was created without expected prop 'src'");
       }
 
-      if (ctx.trialNumber === undefined && !("trialNumber" in props)) {
-        console_1.warn("<TagThought> was created without expected prop 'trialNumber'");
+      if (ctx.currentTrial === undefined && !("currentTrial" in props)) {
+        console_1.warn("<TagThought> was created without expected prop 'currentTrial'");
+      }
+
+      if (ctx.fileName === undefined && !("fileName" in props)) {
+        console_1.warn("<TagThought> was created without expected prop 'fileName'");
       }
 
       return _this;
@@ -48273,7 +52144,15 @@ var app = (function () {
         throw new Error("<TagThought>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
       }
     }, {
-      key: "trialNumber",
+      key: "currentTrial",
+      get: function get() {
+        throw new Error("<TagThought>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<TagThought>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "fileName",
       get: function get() {
         throw new Error("<TagThought>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
       },
@@ -48285,12 +52164,36 @@ var app = (function () {
     return TagThought;
   }(SvelteComponentDev);
 
-  function create_fragment$2(ctx) {
+  var console_1$1 = globals.console;
+  var file$2 = "src/pages/Experiment.svelte"; // (1:0) <script>   // This is the main experiment page. It should get the number of trials and audio filepaths from firebase and then create a TagThought component for each one. Currently it just renders a single TagThought component with a hardcoded audio file   import { createEventDispatcher }
+
+  function create_catch_block(ctx) {
+    var block = {
+      c: noop,
+      m: noop,
+      p: noop,
+      i: noop,
+      o: noop,
+      d: noop
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_catch_block.name,
+      type: "catch",
+      source: "(1:0) <script>   // This is the main experiment page. It should get the number of trials and audio filepaths from firebase and then create a TagThought component for each one. Currently it just renders a single TagThought component with a hardcoded audio file   import { createEventDispatcher }",
+      ctx: ctx
+    });
+    return block;
+  } // (57:0) {:then src}
+
+
+  function create_then_block(ctx) {
     var current;
     var tagthought = new TagThought({
       props: {
         src: ctx.src,
-        trialNumber: ctx.trialNumber
+        currentTrial: ctx.currentTrial,
+        fileName: ctx.fileName
       },
       $$inline: true
     });
@@ -48299,17 +52202,15 @@ var app = (function () {
       c: function create() {
         create_component(tagthought.$$.fragment);
       },
-      l: function claim(nodes) {
-        throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
-      },
       m: function mount(target, anchor) {
         mount_component(tagthought, target, anchor);
         current = true;
       },
       p: function update(changed, ctx) {
         var tagthought_changes = {};
-        if (changed.src) tagthought_changes.src = ctx.src;
-        if (changed.trialNumber) tagthought_changes.trialNumber = ctx.trialNumber;
+        if (changed.filePromise) tagthought_changes.src = ctx.src;
+        if (changed.currentTrial) tagthought_changes.currentTrial = ctx.currentTrial;
+        if (changed.fileName) tagthought_changes.fileName = ctx.fileName;
         tagthought.$set(tagthought_changes);
       },
       i: function intro(local) {
@@ -48327,6 +52228,109 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
+      id: create_then_block.name,
+      type: "then",
+      source: "(57:0) {:then src}",
+      ctx: ctx
+    });
+    return block;
+  } // (55:20)    <h3 class="title is-3">Preparing Trial...</h3> {:then src}
+
+
+  function create_pending_block(ctx) {
+    var h3;
+    var block = {
+      c: function create() {
+        h3 = element("h3");
+        h3.textContent = "Preparing Trial...";
+        attr_dev(h3, "class", "title is-3");
+        add_location(h3, file$2, 55, 2, 1928);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, h3, anchor);
+      },
+      p: noop,
+      i: noop,
+      o: noop,
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(h3);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_pending_block.name,
+      type: "pending",
+      source: "(55:20)    <h3 class=\\\"title is-3\\\">Preparing Trial...</h3> {:then src}",
+      ctx: ctx
+    });
+    return block;
+  }
+
+  function create_fragment$2(ctx) {
+    var await_block_anchor;
+    var promise;
+    var current;
+    var info = {
+      ctx: ctx,
+      current: null,
+      token: null,
+      pending: create_pending_block,
+      then: create_then_block,
+      catch: create_catch_block,
+      value: "src",
+      error: "null",
+      blocks: [,,,]
+    };
+    handle_promise(promise = ctx.filePromise, info);
+    var block = {
+      c: function create() {
+        await_block_anchor = empty();
+        info.block.c();
+      },
+      l: function claim(nodes) {
+        throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, await_block_anchor, anchor);
+        info.block.m(target, info.anchor = anchor);
+
+        info.mount = function () {
+          return await_block_anchor.parentNode;
+        };
+
+        info.anchor = await_block_anchor;
+        current = true;
+      },
+      p: function update(changed, new_ctx) {
+        ctx = new_ctx;
+        info.ctx = ctx;
+
+        if (changed.filePromise && promise !== (promise = ctx.filePromise) && handle_promise(promise, info)) ; else {
+          info.block.p(changed, assign(assign({}, ctx), info.resolved)); // nothing
+        }
+      },
+      i: function intro(local) {
+        if (current) return;
+        transition_in(info.block);
+        current = true;
+      },
+      o: function outro(local) {
+        for (var i = 0; i < 3; i += 1) {
+          var _block = info.blocks[i];
+          transition_out(_block);
+        }
+
+        current = false;
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(await_block_anchor);
+        info.block.d(detaching);
+        info.token = null;
+        info = null;
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
       id: create_fragment$2.name,
       type: "component",
       source: "",
@@ -48336,49 +52340,113 @@ var app = (function () {
   }
 
   function instance$2($$self, $$props, $$invalidate) {
-    var currentFile = 0;
-    var audioFiles = ["https://dl.dropboxusercontent.com/s/vvq50nz47pndx2b/s12_JulieTaylor.wav", "https://dl.dropboxusercontent.com/s/vvq50nz47pndx2b/s12_JulieTaylor.wav"];
+    var trialOrder = $$props.trialOrder;
+    var currentTrial;
+    var fileName;
     var dispatch = createEventDispatcher();
 
+    var generateFileURL = function generateFileURL() {
+      var _file, url;
+
+      return regeneratorRuntime.async(function generateFileURL$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              _context.prev = 0;
+              $$invalidate("fileName", fileName = trialOrder[currentTrial - 1]);
+              _file = storage.refFromURL("gs://thought-segmentation.appspot.com/".concat(fileName));
+              _context.next = 5;
+              return regeneratorRuntime.awrap(_file.getDownloadURL());
+
+            case 5:
+              url = _context.sent;
+              return _context.abrupt("return", url);
+
+            case 9:
+              _context.prev = 9;
+              _context.t0 = _context["catch"](0);
+              console.error(_context.t0);
+
+            case 12:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, null, null, [[0, 9]]);
+    };
+
+    var filePromise = function _callee() {
+      var resp;
+      return regeneratorRuntime.async(function _callee$(_context2) {
+        while (1) {
+          switch (_context2.prev = _context2.next) {
+            case 0:
+              _context2.prev = 0;
+              _context2.next = 3;
+              return regeneratorRuntime.awrap(db$1.collection("participants").doc(params.workerId).get());
+
+            case 3:
+              resp = _context2.sent;
+              $$invalidate("currentTrial", currentTrial = resp.data().currentTrial);
+              _context2.next = 7;
+              return regeneratorRuntime.awrap(generateFileURL());
+
+            case 7:
+              return _context2.abrupt("return", _context2.sent);
+
+            case 10:
+              _context2.prev = 10;
+              _context2.t0 = _context2["catch"](0);
+              return _context2.abrupt("return", console.error(_context2.t0));
+
+            case 13:
+            case "end":
+              return _context2.stop();
+          }
+        }
+      }, null, null, [[0, 10]]);
+    }();
+
     var getNextAudioFile = function getNextAudioFile() {
-      if (currentFile + 1 === audioFiles.length) {
+      if (currentTrial === trialOrder.length) {
         dispatch("finished");
       } else {
-        $$invalidate("currentFile", currentFile += 1);
+        $$invalidate("currentTrial", currentTrial += 1);
+        $$invalidate("filePromise", filePromise = generateFileURL());
       }
+    };
+
+    var writable_props = ["trialOrder"];
+    Object.keys($$props).forEach(function (key) {
+      if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1$1.warn("<Experiment> was created with unknown prop '".concat(key, "'"));
+    });
+
+    $$self.$set = function ($$props) {
+      if ("trialOrder" in $$props) $$invalidate("trialOrder", trialOrder = $$props.trialOrder);
     };
 
     $$self.$capture_state = function () {
-      return {};
+      return {
+        trialOrder: trialOrder,
+        currentTrial: currentTrial,
+        fileName: fileName,
+        filePromise: filePromise
+      };
     };
 
     $$self.$inject_state = function ($$props) {
-      if ("currentFile" in $$props) $$invalidate("currentFile", currentFile = $$props.currentFile);
-      if ("src" in $$props) $$invalidate("src", src = $$props.src);
-      if ("trialNumber" in $$props) $$invalidate("trialNumber", trialNumber = $$props.trialNumber);
-    };
-
-    var src;
-    var trialNumber;
-
-    $$self.$$.update = function () {
-      var changed = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {
-        currentFile: 1
-      };
-
-      if (changed.currentFile) {
-         $$invalidate("src", src = audioFiles[currentFile]);
-      }
-
-      if (changed.currentFile) {
-         $$invalidate("trialNumber", trialNumber = currentFile + 1);
-      }
+      if ("trialOrder" in $$props) $$invalidate("trialOrder", trialOrder = $$props.trialOrder);
+      if ("currentTrial" in $$props) $$invalidate("currentTrial", currentTrial = $$props.currentTrial);
+      if ("fileName" in $$props) $$invalidate("fileName", fileName = $$props.fileName);
+      if ("filePromise" in $$props) $$invalidate("filePromise", filePromise = $$props.filePromise);
     };
 
     return {
-      getNextAudioFile: getNextAudioFile,
-      src: src,
-      trialNumber: trialNumber
+      trialOrder: trialOrder,
+      currentTrial: currentTrial,
+      fileName: fileName,
+      filePromise: filePromise,
+      getNextAudioFile: getNextAudioFile
     };
   }
 
@@ -48393,20 +52461,39 @@ var app = (function () {
       _classCallCheck(this, Experiment);
 
       _this = _possibleConstructorReturn(this, _getPrototypeOf(Experiment).call(this, options));
-      init(_assertThisInitialized(_this), options, instance$2, create_fragment$2, safe_not_equal, {});
+      init(_assertThisInitialized(_this), options, instance$2, create_fragment$2, safe_not_equal, {
+        trialOrder: 0
+      });
       dispatch_dev("SvelteRegisterComponent", {
         component: _assertThisInitialized(_this),
         tagName: "Experiment",
         options: options,
         id: create_fragment$2.name
       });
+      var ctx = _this.$$.ctx;
+      var props = options.props || {};
+
+      if (ctx.trialOrder === undefined && !("trialOrder" in props)) {
+        console_1$1.warn("<Experiment> was created without expected prop 'trialOrder'");
+      }
+
       return _this;
     }
+
+    _createClass(Experiment, [{
+      key: "trialOrder",
+      get: function get() {
+        throw new Error("<Experiment>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<Experiment>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }]);
 
     return Experiment;
   }(SvelteComponentDev);
 
-  var file$2 = "src/pages/Debrief.svelte";
+  var file$3 = "src/pages/Debrief.svelte";
 
   function create_fragment$3(ctx) {
     var div2;
@@ -48427,15 +52514,15 @@ var app = (function () {
         button = element("button");
         button.textContent = "Submit HIT";
         attr_dev(h1, "class", "title");
-        add_location(h1, file$2, 15, 6, 551);
+        add_location(h1, file$3, 16, 6, 583);
         attr_dev(button, "class", "button is-success is-large");
-        add_location(button, file$2, 16, 6, 608);
+        add_location(button, file$3, 17, 6, 640);
         attr_dev(div0, "class", "column is-three-quarters");
-        add_location(div0, file$2, 14, 4, 506);
+        add_location(div0, file$3, 15, 4, 538);
         attr_dev(div1, "class", "columns is-centered");
-        add_location(div1, file$2, 13, 2, 468);
+        add_location(div1, file$3, 14, 2, 500);
         attr_dev(div2, "class", "container");
-        add_location(div2, file$2, 12, 0, 442);
+        add_location(div2, file$3, 13, 0, 474);
         dispose = listen_dev(button, "click", ctx.submitHIT, false, false, false);
       },
       l: function claim(nodes) {
@@ -48508,7 +52595,7 @@ var app = (function () {
     return Debrief;
   }(SvelteComponentDev);
 
-  var file$3 = "src/App.svelte"; // (89:39) 
+  var file$4 = "src/App.svelte"; // (73:39) 
 
   function create_if_block_2(ctx) {
     var current;
@@ -48541,16 +52628,19 @@ var app = (function () {
       block: block,
       id: create_if_block_2.name,
       type: "if",
-      source: "(89:39) ",
+      source: "(73:39) ",
       ctx: ctx
     });
     return block;
-  } // (87:42) 
+  } // (71:42) 
 
 
-  function create_if_block_1(ctx) {
+  function create_if_block_1$1(ctx) {
     var current;
     var experiment = new Experiment({
+      props: {
+        trialOrder: ctx.trialOrder
+      },
       $$inline: true
     });
     experiment.$on("finished", ctx.finished_handler_1);
@@ -48562,7 +52652,11 @@ var app = (function () {
         mount_component(experiment, target, anchor);
         current = true;
       },
-      p: noop,
+      p: function update(changed, ctx) {
+        var experiment_changes = {};
+        if (changed.trialOrder) experiment_changes.trialOrder = ctx.trialOrder;
+        experiment.$set(experiment_changes);
+      },
       i: function intro(local) {
         if (current) return;
         transition_in(experiment.$$.fragment, local);
@@ -48578,13 +52672,13 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_if_block_1.name,
+      id: create_if_block_1$1.name,
       type: "if",
-      source: "(87:42) ",
+      source: "(71:42) ",
       ctx: ctx
     });
     return block;
-  } // (83:2) {#if currentState === 'instructions'}
+  } // (67:2) {#if currentState === 'instructions'}
 
 
   function create_if_block$2(ctx) {
@@ -48619,7 +52713,7 @@ var app = (function () {
       block: block,
       id: create_if_block$2.name,
       type: "if",
-      source: "(83:2) {#if currentState === 'instructions'}",
+      source: "(67:2) {#if currentState === 'instructions'}",
       ctx: ctx
     });
     return block;
@@ -48630,7 +52724,7 @@ var app = (function () {
     var current_block_type_index;
     var if_block;
     var current;
-    var if_block_creators = [create_if_block$2, create_if_block_1, create_if_block_2];
+    var if_block_creators = [create_if_block$2, create_if_block_1$1, create_if_block_2];
     var if_blocks = [];
 
     function select_block_type(changed, ctx) {
@@ -48649,7 +52743,7 @@ var app = (function () {
         section = element("section");
         if (if_block) if_block.c();
         attr_dev(section, "class", "section");
-        add_location(section, file$3, 81, 0, 2866);
+        add_location(section, file$4, 65, 0, 2566);
       },
       l: function claim(nodes) {
         throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -48723,36 +52817,9 @@ var app = (function () {
   }
 
   function instance$4($$self, $$props, $$invalidate) {
-    var unescapeURL = function unescapeURL(s) {
-      return decodeURIComponent(s.replace(/\+/g, "%20"));
-    };
-
-    var getURLParams = function getURLParams() {
-      var params = {};
-      var m = window.location.href.match(/[\\?&]([^=]+)=([^&#]*)/g);
-
-      if (m) {
-        var i = 0;
-
-        while (i < m.length) {
-          var a = m[i].match(/.([^=]+)=(.*)/);
-          params[unescapeURL(a[1])] = unescapeURL(a[2]);
-          i += 1;
-        }
-      }
-
-      return params;
-    };
-
-    var params = getURLParams();
-
-    if (!params.workerId && !params.assignmentId && !params.hitId) {
-      params.workerId = "test-worker";
-      params.assignmentId = "test-assignment";
-      params.hitId = "test-hit";
-    }
-
     var currentState;
+    var trialOrder = ["s01_BuddyGarrity.wav", "s01_CoachTaylor.wav"];
+    fisherYatesShuffle(trialOrder);
 
     var updateState = function updateState(newState) {
       return regeneratorRuntime.async(function updateState$(_context) {
@@ -48786,8 +52853,8 @@ var app = (function () {
       }, null, null, [[1, 7]]);
     };
 
-    onMount(function _callee() {
-      var resp;
+    (function _callee() {
+      var resp, data;
       return regeneratorRuntime.async(function _callee$(_context2) {
         while (1) {
           switch (_context2.prev = _context2.next) {
@@ -48800,45 +52867,49 @@ var app = (function () {
               resp = _context2.sent;
 
               if (!resp.exists) {
-                _context2.next = 9;
+                _context2.next = 11;
                 break;
               }
 
-              $$invalidate("currentState", currentState = resp.data().currentState);
+              data = resp.data();
+              $$invalidate("currentState", currentState = data.currentState);
+              $$invalidate("trialOrder", trialOrder = data.trialOrder);
               console.log("user found...loading state");
-              _context2.next = 13;
+              _context2.next = 15;
               break;
 
-            case 9:
-              _context2.next = 11;
+            case 11:
+              _context2.next = 13;
               return regeneratorRuntime.awrap(db$1.collection("participants").doc(params.workerId).set({
                 workerId: params.workerId,
                 assignmentId: params.assignmentId,
                 hitId: params.hitId,
                 startTime: new Date(),
-                currentState: "instructions"
+                currentState: "instructions",
+                currentTrial: 1,
+                trialOrder: trialOrder
               }));
 
-            case 11:
+            case 13:
               $$invalidate("currentState", currentState = "instructions");
               console.log("no user found...creating");
 
-            case 13:
-              _context2.next = 18;
+            case 15:
+              _context2.next = 20;
               break;
 
-            case 15:
-              _context2.prev = 15;
+            case 17:
+              _context2.prev = 17;
               _context2.t0 = _context2["catch"](0);
               console.error(_context2.t0);
 
-            case 18:
+            case 20:
             case "end":
               return _context2.stop();
           }
         }
-      }, null, null, [[0, 15]]);
-    });
+      }, null, null, [[0, 17]]);
+    })();
 
     var finished_handler = function finished_handler() {
       return updateState("experiment");
@@ -48854,10 +52925,12 @@ var app = (function () {
 
     $$self.$inject_state = function ($$props) {
       if ("currentState" in $$props) $$invalidate("currentState", currentState = $$props.currentState);
+      if ("trialOrder" in $$props) $$invalidate("trialOrder", trialOrder = $$props.trialOrder);
     };
 
     return {
       currentState: currentState,
+      trialOrder: trialOrder,
       updateState: updateState,
       finished_handler: finished_handler,
       finished_handler_1: finished_handler_1

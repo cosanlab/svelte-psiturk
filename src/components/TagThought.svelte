@@ -2,17 +2,22 @@
   // This is the main ThoughTagging component that gets rendered within Experiment.svelte. It takes as an "argument" a "src" value from Experiment.svelte that tells it which audo file to render
   import Peaks from 'peaks.js';
   import { onMount, createEventDispatcher } from 'svelte';
-  import { db } from '../firebase.js';
+  import { db, params } from '../utils.js';
 
   // This is how the Experiment page can tell TagThought which src to display in Peaksjs. It's like a function argument to TagThought
   export let src;
-  export let trialNumber;
+  export let currentTrial;
+  export let fileName;
+  // eslint-disable-next-line prefer-const
+  let [subjectId, character] = fileName.split('_');
+  [character] = character.split('_');
   let peaksInstance;
   let segments = [];
   let selectedSegmentId;
   let rowSelected = false;
   let segmentPrevMax = 0;
   const dispatch = createEventDispatcher();
+  let peaksLoading = true;
 
   // After Svelte has created the webpage, initialize the peaks.js waveform player and all of its event-handlers. Also make sure the segments variable gets updated whenever a user manipulates the waveform player
   onMount(() => {
@@ -33,6 +38,7 @@
       if (err) {
         console.error(err);
       } else {
+        peaksLoading = false;
         console.log('Peaks instance ready');
         segments = peaksInstance.segments.getSegments();
       }
@@ -50,28 +56,42 @@
   });
 
   // Grab the start and end time for each thought and save them into firebase
-  function finish() {
-    // if (segments) {
-    //   if (segments.length < 2) {
-    //     alert("Please tag a few more thoughts");
-    //   }
-    //   else {
-    //     // We have to strip-out the extra properties that segment objects have (e.g. like waveform color) because firebase doesn't like that. Plus we only care about start and end times
-    //     let toSave = {};
-    //     segments.forEach((obj) => {
-    //       toSave[obj._id] = { startTime: obj._startTime, endTime: obj._endTime };
-    //     });
-    //     db.collection('thoughts').doc('test-user').set(Object.assign({}, toSave))
-    //       .then(() => {
-    //         console.log("document added successfully");
-    //       })
-    //       .catch((error) => {
-    //         console.error(error);
-    //       });
-    //   }
-    // }
-    dispatch('next');
-  }
+  const finish = async () => {
+    if (segments) {
+      if (segments.length < 2) {
+        alert('Please tag a few more thoughts');
+      } else {
+        // We have to strip-out the extra properties that segment objects have (e.g. like waveform color) because firebase doesn't like that. Plus we only care about start and end times
+        const toSave = {};
+        segments.forEach((obj) => {
+          toSave[obj._id] = {
+            startTime: obj._startTime,
+            endTime: obj._endTime
+          };
+        });
+        // Create a nested dictionary of data to save with the key being the current trial number and sub-dictionaries containing the subject id of the person speaking, the character being talked about and the tagged thoughts
+        const doc = {
+          [`trial_${currentTrial}`]: {
+            subject: subjectId,
+            character,
+            thoughts: toSave
+          },
+          currentTrial: currentTrial + 1
+        };
+        try {
+          await db
+            .collection('participants')
+            .doc(params.workerId)
+            .set(doc, { merge: true });
+          console.log('document added successfully');
+          peaksInstance.destroy();
+          dispatch('next');
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    }
+  };
 
   // Store a new segment on button click
   function addSegment() {
@@ -152,7 +172,10 @@
 <div class="container">
   <div class="columns is-centered">
     <div class="column is-three-quarters">
-      <h1 class="title">Recording #{trialNumber}</h1>
+      <h1 class="title">Recording #{currentTrial}</h1>
+      {#if peaksLoading}
+        <h3 class="title is-3">Loading audio...</h3>
+      {/if}
       <div id="waveform-container" />
       <div class="columns">
         <div class="column is-one-quarter">

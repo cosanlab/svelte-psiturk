@@ -17,10 +17,10 @@
 	<script type="text/javascript">
 		// These fields provided by the psiTurk Server
 		// They are passed to Svelte in the consent.html template by adding them to the window.location as parameters
-		var uniqueId = "{{ uniqueId }}";  
+		var uniqueId = "{{ uniqueId }}";
 		var condition = "{{ condition }}";
-		var counterbalance = "{{ counterbalance }}"; 
-		var adServerLoc = "{{ adServerLoc }}"; 
+		var counterbalance = "{{ counterbalance }}";
+		var adServerLoc = "{{ adServerLoc }}";
 		var mode = "{{ mode }}";
 
 		// Event listener for iframe so Svelte can tell PsiTurk when it's finished
@@ -33,7 +33,7 @@
 			}
 		});
 	</script>
-	
+
 	<!-- Load Psiturk dependencies -->
 	<script src="/static/js/utils.js" type="text/javascript"> </script>
 	<script src="/static/js/psiturk.js" type="text/javascript"> </script>

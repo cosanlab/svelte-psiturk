@@ -1,39 +1,20 @@
 <script>
-  // This is the main Svelte component that will display after a user provides conset within PsiTurk. It's basically just a wrapper whose job is to render different states of the svelte app based upon what a user does, i.e. show instructions, show quiz, show trials, show exit survey. Each of those different states exist as their own .svelte files within the pages/ folder
-  import { onMount } from 'svelte';
-  import { db } from './firebase.js';
+  // This is the main Svelte component that will display after a user provides conset within PsiTurk. It serves two main purposes: 1) it initializes a new entry into the firebase database if a workerId from the URL is not found or retrieves an existing record if a workerId is found. Creating a new entry sets up the random trial order the participant will receive for all the recordings. 2) it uses that information to dynamically render different experiment states based upon what a user does i.e. show instructions, show quiz, show experiment, show exit survey. Each of those different states exist as their own .svelte files within the pages/ folder
+  import { db, params, fisherYatesShuffle } from './utils.js';
   import Instructions from './pages/Instructions.svelte';
   // import Quiz from './pages/Quiz.svelte';
   import Experiment from './pages/Experiment.svelte';
   import Debrief from './pages/Debrief.svelte';
 
-  // Functions to parse the URL to get workerID, hitID, and assignmentID
-  const unescapeURL = (s) => decodeURIComponent(s.replace(/\+/g, '%20'));
-  const getURLParams = () => {
-    const params = {};
-    const m = window.location.href.match(/[\\?&]([^=]+)=([^&#]*)/g);
-    if (m) {
-      let i = 0;
-      while (i < m.length) {
-        const a = m[i].match(/.([^=]+)=(.*)/);
-        params[unescapeURL(a[1])] = unescapeURL(a[2]);
-        i += 1;
-      }
-    }
-    return params;
-  };
-  // Parse the URL to create a dictionary of Mturk info, otherwise create a fake one
-  const params = getURLParams();
-  if (!params.workerId && !params.assignmentId && !params.hitId) {
-    params.workerId = 'test-worker';
-    params.assignmentId = 'test-assignment';
-    params.hitId = 'test-hit';
-  }
-
   // Local variable that's synced to firebase
   let currentState;
 
-  // This function updates the current state of the user to dynamical render different parts of the experiment (i.e. instructions, quiz, etc)
+  // Setup a random trial order
+  // TODO: Add the full list of file names we want to use here
+  let trialOrder = ['s01_BuddyGarrity.wav', 's01_CoachTaylor.wav'];
+  fisherYatesShuffle(trialOrder);
+
+  // This function updates the current state of the user to dynamically render different parts of the experiment (i.e. instructions, quiz, etc)
   const updateState = async (newState) => {
     // Change to the new state within Svelte
     currentState = newState;
@@ -48,14 +29,17 @@
     }
   };
 
-  onMount(async () => {
+  // Before we render anything see if we have a db entry for this subject based upon the URL parameters. If not create an entry with a new random stimulus order and put them into the instructions state. If we do, load their trial order and current experiment state
+  (async () => {
     try {
       const resp = await db
         .collection('participants')
         .doc(params.workerId)
         .get();
       if (resp.exists) {
-        currentState = resp.data().currentState;
+        const data = resp.data();
+        currentState = data.currentState;
+        trialOrder = data.trialOrder;
         console.log('user found...loading state');
       } else {
         await db
@@ -66,7 +50,9 @@
             assignmentId: params.assignmentId,
             hitId: params.hitId,
             startTime: new Date(),
-            currentState: 'instructions'
+            currentState: 'instructions',
+            currentTrial: 1,
+            trialOrder
           });
         currentState = 'instructions';
         console.log('no user found...creating');
@@ -74,7 +60,7 @@
     } catch (error) {
       console.error(error);
     }
-  });
+  })();
 </script>
 
 <section class="section">
@@ -83,7 +69,7 @@
     <!-- TODO: Instructions should go to quiz rather than experiment, afer we finish making the quiz page -->
     <Instructions on:finished={() => updateState('experiment')} />
   {:else if currentState === 'experiment'}
-    <Experiment on:finished={() => updateState('debrief')} />
+    <Experiment {trialOrder} on:finished={() => updateState('debrief')} />
   {:else if currentState === 'debrief'}
     <Debrief />
   {/if}
