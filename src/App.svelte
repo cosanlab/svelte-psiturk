@@ -12,9 +12,6 @@
   let currentState;
 
   // Setup a random trial order
-  // TODO: Add the full list of file names we want to use here
-  // TODO: Create a separate db for stimuli to track how many HITs we have for each one then
-  // TODO: setup random sampling from firebase to get files that have the least number of responses across participants
   let trialOrder = [];
 
   // This function updates the current state of the user to dynamically render different parts of the experiment (i.e. instructions, quiz, etc)
