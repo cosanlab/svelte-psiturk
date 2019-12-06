@@ -18,6 +18,27 @@
   let segmentPrevMax = 0;
   const dispatch = createEventDispatcher();
   let peaksLoading = true;
+  let rate = false;
+  let confidence = 50;
+  let clarity = 50;
+  let clarityRated = false;
+  let confidenceRated = false;
+  let time = '';
+  let timer;
+  let invalidTime = false;
+  $: nextTrialActive = !(clarityRated && confidenceRated && time && !invalidTime);
+  $: ratingActive = segments.length === 0;
+
+  const debounce = (v) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if ((time.length === 5 && time.includes(':')) || !time) {
+        invalidTime = false;
+      } else {
+        invalidTime = true;
+      }
+    }, 600);
+  };
 
   // After Svelte has created the webpage, initialize the peaks.js waveform player and all of its event-handlers. Also make sure the segments variable gets updated whenever a user manipulates the waveform player
   onMount(() => {
@@ -57,42 +78,46 @@
 
   // Grab the start and end time for each thought and save them into firebase
   const finish = async () => {
-    if (segments) {
-      if (segments.length < 2) {
-        alert('Please tag a few more thoughts');
-      } else {
-        // We have to strip-out the extra properties that segment objects have (e.g. like waveform color) because firebase doesn't like that. Plus we only care about start and end times
-        const toSave = {};
-        segments.forEach((obj) => {
-          toSave[obj._id] = {
-            startTime: obj._startTime,
-            endTime: obj._endTime
-          };
-        });
-        // Create a nested dictionary of data to save with the key being the current trial number and sub-dictionaries containing the subject id of the person speaking, the character being talked about and the tagged thoughts
-        const doc = {
-          [`trial_${currentTrial}`]: {
-            subject: subjectId,
-            character,
-            thoughts: toSave
-          },
-          currentTrial: currentTrial + 1
-        };
-        try {
-          await db
-            .collection('participants')
-            .doc(params.workerId)
-            .set(doc, { merge: true });
-          console.log('document added successfully');
-          peaksInstance.destroy();
-          dispatch('next');
-        } catch (error) {
-          console.error(error);
-        }
-      }
+    // We have to strip-out the extra properties that segment objects have (e.g. like waveform color) because firebase doesn't like that. Plus we only care about start and end times
+    const toSave = {};
+    segments.forEach((obj) => {
+      toSave[obj._id] = {
+        startTime: obj._startTime,
+        endTime: obj._endTime
+      };
+    });
+    // Create a nested dictionary of data to save with the key being the current trial number and sub-dictionaries containing the subject id of the person speaking, the character being talked about and the tagged thoughts
+    const doc = {
+      [`trial_${currentTrial}`]: {
+        subject: subjectId,
+        character: character.slice(0, character.length - 4),
+        clarity,
+        confidence,
+        recordingLength: time,
+        thoughts: toSave
+      },
+      currentTrial: currentTrial + 1
+    };
+    try {
+      await db
+        .collection('participants')
+        .doc(params.workerId)
+        .set(doc, { merge: true });
+      console.log('document added successfully');
+      peaksInstance.destroy();
+      dispatch('next');
+    } catch (error) {
+      console.error(error);
     }
   };
 
+  const makeRatings = () => {
+    if (!segments || (segments && segments.length <= 2)) {
+      alert('Please tag a few more thoughts');
+    } else {
+      rate = !rate;
+    }
+  };
   // Store a new segment on button click
   function addSegment() {
     peaksInstance.segments.add({
@@ -127,10 +152,7 @@
       rowSelected = true;
     }
     // Save the segment id
-    selectedSegmentId = parseInt(
-      row.querySelector('td.segment-id').innerText,
-      10
-    );
+    selectedSegmentId = parseInt(row.querySelector('td.segment-id').innerText, 10);
     selectedSegmentId = `peaks.segment.${selectedSegmentId.toString()}`;
   }
 
@@ -167,16 +189,25 @@
     margin-left: auto;
     margin-right: auto;
   }
+
+  .loading-button {
+    font-size: 4.5rem !important;
+  }
 </style>
 
-<div class="container">
+<div class="container is-fluid">
   <div class="columns is-centered">
-    <div class="column is-three-quarters">
+    <div class="column is-three-quarters has-text-centered">
       <h1 class="title">Recording #{currentTrial}</h1>
       {#if peaksLoading}
         <h3 class="title is-3">Loading audio...</h3>
+        <button class="button is-white is-loading loading-button" disabled />
       {/if}
       <div id="waveform-container" />
+    </div>
+  </div>
+  <div class="columns is-centered">
+    <div class="column is-three-quarters">
       <div class="columns">
         <div class="column is-one-quarter">
           <audio id="audio" controls="controls">
@@ -185,55 +216,118 @@
           </audio>
         </div>
         <div class="column is-one-half">
-          <button class="button is-primary is-large" on:click={addSegment}>
-            Tag Thought
-          </button>
-          <button class="button is-info is-large" on:click={finish}>
-            Finished
-          </button>
-          <button
-            class={rowSelected ? 'button is-success is-large' : 'button is-success is-large hidden'}
-            on:click={playSegment}>
-            Play Thought
-          </button>
-          <button
-            class={rowSelected ? 'button is-danger is-large' : 'button is-danger is-large hidden'}
-            on:click={deleteSegment}>
-            Delete Segment
-          </button>
-          <!-- <button class="button is-warning is-large" on:click={seeSegments}>Debug</button> -->
+          {#if rate}
+            <button class="button is-primary is-large" on:click={finish} disabled={nextTrialActive}>
+              Next Recording
+            </button>
+          {:else}
+            <button class="button is-primary is-large" on:click={addSegment}>Tag Thought</button>
+            <button class="button is-info is-large" disabled={ratingActive} on:click={makeRatings}>
+              Done
+            </button>
+            <button
+              class={rowSelected ? 'button is-success is-large' : 'button is-success is-large hidden'}
+              on:click={playSegment}>
+              Play Thought
+            </button>
+            <button
+              class={rowSelected ? 'button is-danger is-large' : 'button is-danger is-large hidden'}
+              on:click={deleteSegment}>
+              Delete Segment
+            </button>
+            <!-- <button class="button is-warning is-large" on:click={seeSegments}>Debug</button> -->
+          {/if}
         </div>
       </div>
     </div>
+
   </div>
-  <div class="columns is-centered">
-    <div class="column is-three-quarters has-text-centered">
-      {#if segments && segments.length}
-        <div class="table-container">
-          <table class="table is-hoverable">
-            <thead>
-              <tr>
-                <th>Thought Number</th>
-                <th>Start time</th>
-                <th>End time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each segments as segment, i (segment.id)}
-                <tr on:click={selectSegment} class="table-row">
-                  <td type="text" class="segment-id">
-                    {segment.id.split('.').slice(-1)[0]}
-                  </td>
-                  <td type="number">{segment.startTime.toFixed(2)}</td>
-                  <td type="number">{segment.endTime.toFixed(2)}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
+  {#if rate}
+    <div class={rate ? 'columns is-centered' : 'columns is-centered'}>
+      <div class="column is-3 has-text-centered">
+        <div class="field">
+          <label class="label has-text-weight-normal is-size-5">
+            When did the speaker stop talking?
+          </label>
+          <div class="control">
+            <input
+              class={invalidTime ? 'input age-input is-danger' : 'input age-input'}
+              type="text"
+              bind:value={time}
+              on:keyup={(ev) => debounce(ev.target.value)}
+              placeholder="Please enter a timestamp like MM:SS" />
+          </div>
+          {#if invalidTime}
+            <p class="help is-danger">Invalid timestamp. Please use MM:SS format.</p>
+          {/if}
         </div>
-      {:else}
-        <h2 class="title is-4">No Thoughts Tagged</h2>
-      {/if}
+      </div>
+      <div class="column is-3 has-text-centered">
+        <p class="has-text-centered is-size-5">How clear was the quality of the recording?</p>
+        <input
+          step="1"
+          min="0"
+          max="100"
+          type="range"
+          bind:value={clarity}
+          on:click|once={() => (clarityRated = true)} />
+        <div class="columns is-centered">
+          <div class="column has-text-left">
+            <p class="subtitle is-size-6">Uninterpretable</p>
+          </div>
+          <div class="column has-text-right">
+            <p class="subtitle is-size-6">Perfect</p>
+          </div>
+        </div>
+      </div>
+      <div class="column is-3 has-text-centered">
+        <p class="has-text-centered is-size-5">How easy was it to tag different thoughts?</p>
+        <input
+          step="1"
+          min="0"
+          max="100"
+          type="range"
+          bind:value={confidence}
+          on:click|once={() => (confidenceRated = true)} />
+        <div class="columns is-centered">
+          <div class="column has-text-left">
+            <p class="subtitle is-size-6">Impossible</p>
+          </div>
+          <div class="column has-text-right">
+            <p class="subtitle is-size-6">Effortless</p>
+          </div>
+        </div>
+      </div>
+
     </div>
-  </div>
+  {:else}
+    <div class="columns is-centered">
+      <div class="column is-three-quarters has-text-centered">
+        {#if segments && segments.length}
+          <div class="table-container">
+            <table class="table is-hoverable">
+              <thead>
+                <tr>
+                  <th>Thought Number</th>
+                  <th>Start time</th>
+                  <th>End time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each segments as segment, i (segment.id)}
+                  <tr on:click={selectSegment} class="table-row">
+                    <td type="text" class="segment-id">{segment.id.split('.').slice(-1)[0]}</td>
+                    <td type="number">{segment.startTime.toFixed(2)}</td>
+                    <td type="number">{segment.endTime.toFixed(2)}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {:else}
+          <h2 class="title is-4">No Thoughts Tagged</h2>
+        {/if}
+      </div>
+    </div>
+  {/if}
 </div>

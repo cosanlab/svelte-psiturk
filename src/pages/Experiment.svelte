@@ -3,6 +3,7 @@
   import { createEventDispatcher } from 'svelte';
   import { db, storage, params } from '../utils.js';
   import TagThought from '../components/TagThought.svelte';
+  import Loading from '../components/Loading.svelte';
 
   // Get trialOrder from App.svelte, which pulls it from firebase
   export let trialOrder;
@@ -17,9 +18,7 @@
   const generateFileURL = async () => {
     try {
       fileName = trialOrder[currentTrial - 1];
-      const file = storage.refFromURL(
-        `gs://thought-segmentation.appspot.com/${fileName}`
-      );
+      const file = storage.refFromURL(`gs://thought-segmentation.appspot.com/${fileName}`);
       const url = await file.getDownloadURL();
       return url;
     } catch (error) {
@@ -53,7 +52,7 @@
 </script>
 
 {#await filePromise}
-  <h3 class="title is-3">Preparing Trial...</h3>
+  <Loading>Preparing Recording...</Loading>
 {:then src}
   <TagThought {src} {currentTrial} {fileName} on:next={getNextAudioFile} />
 {/await}

@@ -4175,6 +4175,21 @@ var app = (function () {
     return a != a ? b == b : a !== b || a && _typeof(a) === 'object' || typeof a === 'function';
   }
 
+  function create_slot(definition, ctx, fn) {
+    if (definition) {
+      var slot_ctx = get_slot_context(definition, ctx, fn);
+      return definition[0](slot_ctx);
+    }
+  }
+
+  function get_slot_context(definition, ctx, fn) {
+    return definition[1] ? assign({}, assign(ctx.$$scope.ctx, definition[1](fn ? fn(ctx) : {}))) : ctx.$$scope.ctx;
+  }
+
+  function get_slot_changes(definition, ctx, changed, fn) {
+    return definition[1] ? assign({}, assign(ctx.$$scope.changed || {}, definition[1](fn ? fn(changed) : {}))) : ctx.$$scope.changed || {};
+  }
+
   function null_to_empty(value) {
     return value == null ? '' : value;
   }
@@ -4224,6 +4239,10 @@ var app = (function () {
 
   function attr(node, attribute, value) {
     if (value == null) node.removeAttribute(attribute);else if (node.getAttribute(attribute) !== value) node.setAttribute(attribute, value);
+  }
+
+  function to_number(value) {
+    return value === '' ? undefined : +value;
   }
 
   function children(element) {
@@ -4798,6 +4817,15 @@ var app = (function () {
     });else dispatch_dev("SvelteDOMSetAttribute", {
       node: node,
       attribute: attribute,
+      value: value
+    });
+  }
+
+  function prop_dev(node, property, value) {
+    node[property] = value;
+    dispatch_dev("SvelteDOMSetProperty", {
+      node: node,
+      property: property,
       value: value
     });
   }
@@ -35303,6 +35331,20 @@ var app = (function () {
   // https://tc39.github.io/ecma262/#sec-symbol.iterator
   defineWellKnownSymbol('iterator');
 
+  var $includes = arrayIncludes.includes;
+
+
+  // `Array.prototype.includes` method
+  // https://tc39.github.io/ecma262/#sec-array.prototype.includes
+  _export({ target: 'Array', proto: true }, {
+    includes: function includes(el /* , fromIndex = 0 */) {
+      return $includes(this, el, arguments.length > 1 ? arguments[1] : undefined);
+    }
+  });
+
+  // https://tc39.github.io/ecma262/#sec-array.prototype-@@unscopables
+  addToUnscopables('includes');
+
   // `thisNumberValue` abstract operation
   // https://tc39.github.io/ecma262/#sec-thisnumbervalue
   var thisNumberValue = function (value) {
@@ -35512,6 +35554,35 @@ var app = (function () {
       return '/' + p + '/' + f;
     }, { unsafe: true });
   }
+
+  var notARegexp = function (it) {
+    if (isRegexp(it)) {
+      throw TypeError("The method doesn't accept regular expressions");
+    } return it;
+  };
+
+  var MATCH$1 = wellKnownSymbol('match');
+
+  var correctIsRegexpLogic = function (METHOD_NAME) {
+    var regexp = /./;
+    try {
+      '/./'[METHOD_NAME](regexp);
+    } catch (e) {
+      try {
+        regexp[MATCH$1] = false;
+        return '/./'[METHOD_NAME](regexp);
+      } catch (f) { /* empty */ }
+    } return false;
+  };
+
+  // `String.prototype.includes` method
+  // https://tc39.github.io/ecma262/#sec-string.prototype.includes
+  _export({ target: 'String', proto: true, forced: !correctIsRegexpLogic('includes') }, {
+    includes: function includes(searchString /* , position = 0 */) {
+      return !!~String(requireObjectCoercible(this))
+        .indexOf(notARegexp(searchString), arguments.length > 1 ? arguments[1] : undefined);
+    }
+  });
 
   var peaks = createCommonjsModule(function (module, exports) {
   (function(f){{module.exports=f();}})(function(){return (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof commonjsRequire&&commonjsRequire;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t);}return n[i].exports}for(var u="function"==typeof commonjsRequire&&commonjsRequire,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(_dereq_,module,exports){
@@ -51394,44 +51465,457 @@ var app = (function () {
     child_ctx.segment = list[i];
     child_ctx.i = i;
     return child_ctx;
-  } // (176:6) {#if peaksLoading}
+  } // (202:6) {#if peaksLoading}
 
 
-  function create_if_block_1(ctx) {
+  function create_if_block_4(ctx) {
     var h3;
+    var t1;
+    var button;
     var block = {
       c: function create() {
         h3 = element("h3");
         h3.textContent = "Loading audio...";
+        t1 = space();
+        button = element("button");
         attr_dev(h3, "class", "title is-3");
-        add_location(h3, file$1, 176, 8, 5989);
+        add_location(h3, file$1, 202, 8, 6656);
+        attr_dev(button, "class", "button is-white is-loading loading-button svelte-1k5bkci");
+        button.disabled = true;
+        add_location(button, file$1, 203, 8, 6709);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h3, anchor);
+        insert_dev(target, t1, anchor);
+        insert_dev(target, button, anchor);
       },
       d: function destroy(detaching) {
         if (detaching) detach_dev(h3);
+        if (detaching) detach_dev(t1);
+        if (detaching) detach_dev(button);
       }
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_if_block_1.name,
+      id: create_if_block_4.name,
       type: "if",
-      source: "(176:6) {#if peaksLoading}",
+      source: "(202:6) {#if peaksLoading}",
       ctx: ctx
     });
     return block;
-  } // (234:6) {:else}
+  } // (223:10) {:else}
+
+
+  function create_else_block_2(ctx) {
+    var button0;
+    var t1;
+    var button1;
+    var t2;
+    var t3;
+    var button2;
+    var t4;
+    var button2_class_value;
+    var t5;
+    var button3;
+    var t6;
+    var button3_class_value;
+    var dispose;
+    var block = {
+      c: function create() {
+        button0 = element("button");
+        button0.textContent = "Tag Thought";
+        t1 = space();
+        button1 = element("button");
+        t2 = text("Done");
+        t3 = space();
+        button2 = element("button");
+        t4 = text("Play Thought");
+        t5 = space();
+        button3 = element("button");
+        t6 = text("Delete Segment");
+        attr_dev(button0, "class", "button is-primary is-large");
+        add_location(button0, file$1, 223, 12, 7434);
+        attr_dev(button1, "class", "button is-info is-large");
+        button1.disabled = ctx.ratingActive;
+        add_location(button1, file$1, 224, 12, 7532);
+        attr_dev(button2, "class", button2_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-success is-large" : "button is-success is-large hidden") + " svelte-1k5bkci"));
+        add_location(button2, file$1, 227, 12, 7673);
+        attr_dev(button3, "class", button3_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-danger is-large" : "button is-danger is-large hidden") + " svelte-1k5bkci"));
+        add_location(button3, file$1, 232, 12, 7883);
+        dispose = [listen_dev(button0, "click", ctx.addSegment, false, false, false), listen_dev(button1, "click", ctx.makeRatings, false, false, false), listen_dev(button2, "click", ctx.playSegment, false, false, false), listen_dev(button3, "click", ctx.deleteSegment, false, false, false)];
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, button0, anchor);
+        insert_dev(target, t1, anchor);
+        insert_dev(target, button1, anchor);
+        append_dev(button1, t2);
+        insert_dev(target, t3, anchor);
+        insert_dev(target, button2, anchor);
+        append_dev(button2, t4);
+        insert_dev(target, t5, anchor);
+        insert_dev(target, button3, anchor);
+        append_dev(button3, t6);
+      },
+      p: function update(changed, ctx) {
+        if (changed.ratingActive) {
+          prop_dev(button1, "disabled", ctx.ratingActive);
+        }
+
+        if (changed.rowSelected && button2_class_value !== (button2_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-success is-large" : "button is-success is-large hidden") + " svelte-1k5bkci"))) {
+          attr_dev(button2, "class", button2_class_value);
+        }
+
+        if (changed.rowSelected && button3_class_value !== (button3_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-danger is-large" : "button is-danger is-large hidden") + " svelte-1k5bkci"))) {
+          attr_dev(button3, "class", button3_class_value);
+        }
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(button0);
+        if (detaching) detach_dev(t1);
+        if (detaching) detach_dev(button1);
+        if (detaching) detach_dev(t3);
+        if (detaching) detach_dev(button2);
+        if (detaching) detach_dev(t5);
+        if (detaching) detach_dev(button3);
+        run_all(dispose);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_else_block_2.name,
+      type: "else",
+      source: "(223:10) {:else}",
+      ctx: ctx
+    });
+    return block;
+  } // (219:10) {#if rate}
+
+
+  function create_if_block_3(ctx) {
+    var button;
+    var t;
+    var dispose;
+    var block = {
+      c: function create() {
+        button = element("button");
+        t = text("Next Recording");
+        attr_dev(button, "class", "button is-primary is-large");
+        button.disabled = ctx.nextTrialActive;
+        add_location(button, file$1, 219, 12, 7264);
+        dispose = listen_dev(button, "click", ctx.finish, false, false, false);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, button, anchor);
+        append_dev(button, t);
+      },
+      p: function update(changed, ctx) {
+        if (changed.nextTrialActive) {
+          prop_dev(button, "disabled", ctx.nextTrialActive);
+        }
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(button);
+        dispose();
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block_3.name,
+      type: "if",
+      source: "(219:10) {#if rate}",
+      ctx: ctx
+    });
+    return block;
+  } // (303:2) {:else}
 
 
   function create_else_block$1(ctx) {
+    var div1;
+    var div0;
+
+    function select_block_type_2(changed, ctx) {
+      if (ctx.segments && ctx.segments.length) return create_if_block_2;
+      return create_else_block_1;
+    }
+
+    var current_block_type = select_block_type_2(null, ctx);
+    var if_block = current_block_type(ctx);
+    var block = {
+      c: function create() {
+        div1 = element("div");
+        div0 = element("div");
+        if_block.c();
+        attr_dev(div0, "class", "column is-three-quarters has-text-centered");
+        add_location(div0, file$1, 304, 6, 10384);
+        attr_dev(div1, "class", "columns is-centered");
+        add_location(div1, file$1, 303, 4, 10344);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, div1, anchor);
+        append_dev(div1, div0);
+        if_block.m(div0, null);
+      },
+      p: function update(changed, ctx) {
+        if (current_block_type === (current_block_type = select_block_type_2(changed, ctx)) && if_block) {
+          if_block.p(changed, ctx);
+        } else {
+          if_block.d(1);
+          if_block = current_block_type(ctx);
+
+          if (if_block) {
+            if_block.c();
+            if_block.m(div0, null);
+          }
+        }
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(div1);
+        if_block.d();
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_else_block$1.name,
+      type: "else",
+      source: "(303:2) {:else}",
+      ctx: ctx
+    });
+    return block;
+  } // (245:2) {#if rate}
+
+
+  function create_if_block$1(ctx) {
+    var div11;
+    var div2;
+    var div1;
+    var label;
+    var t1;
+    var div0;
+    var input0;
+    var input0_class_value;
+    var t2;
+    var t3;
+    var div6;
+    var p0;
+    var t5;
+    var input1;
+    var t6;
+    var div5;
+    var div3;
+    var p1;
+    var t8;
+    var div4;
+    var p2;
+    var t10;
+    var div10;
+    var p3;
+    var t12;
+    var input2;
+    var t13;
+    var div9;
+    var div7;
+    var p4;
+    var t15;
+    var div8;
+    var p5;
+    var div11_class_value;
+    var dispose;
+    var if_block = ctx.invalidTime && create_if_block_1(ctx);
+    var block = {
+      c: function create() {
+        div11 = element("div");
+        div2 = element("div");
+        div1 = element("div");
+        label = element("label");
+        label.textContent = "When did the speaker stop talking?";
+        t1 = space();
+        div0 = element("div");
+        input0 = element("input");
+        t2 = space();
+        if (if_block) if_block.c();
+        t3 = space();
+        div6 = element("div");
+        p0 = element("p");
+        p0.textContent = "How clear was the quality of the recording?";
+        t5 = space();
+        input1 = element("input");
+        t6 = space();
+        div5 = element("div");
+        div3 = element("div");
+        p1 = element("p");
+        p1.textContent = "Uninterpretable";
+        t8 = space();
+        div4 = element("div");
+        p2 = element("p");
+        p2.textContent = "Perfect";
+        t10 = space();
+        div10 = element("div");
+        p3 = element("p");
+        p3.textContent = "How easy was it to tag different thoughts?";
+        t12 = space();
+        input2 = element("input");
+        t13 = space();
+        div9 = element("div");
+        div7 = element("div");
+        p4 = element("p");
+        p4.textContent = "Impossible";
+        t15 = space();
+        div8 = element("div");
+        p5 = element("p");
+        p5.textContent = "Effortless";
+        attr_dev(label, "class", "label has-text-weight-normal is-size-5");
+        add_location(label, file$1, 248, 10, 8422);
+        attr_dev(input0, "class", input0_class_value = ctx.invalidTime ? "input age-input is-danger" : "input age-input");
+        attr_dev(input0, "type", "text");
+        attr_dev(input0, "placeholder", "Please enter a timestamp like MM:SS");
+        add_location(input0, file$1, 252, 12, 8587);
+        attr_dev(div0, "class", "control");
+        add_location(div0, file$1, 251, 10, 8553);
+        attr_dev(div1, "class", "field");
+        add_location(div1, file$1, 247, 8, 8392);
+        attr_dev(div2, "class", "column is-3 has-text-centered");
+        add_location(div2, file$1, 246, 6, 8340);
+        attr_dev(p0, "class", "has-text-centered is-size-5");
+        add_location(p0, file$1, 265, 8, 9095);
+        attr_dev(input1, "step", "1");
+        attr_dev(input1, "min", "0");
+        attr_dev(input1, "max", "100");
+        attr_dev(input1, "type", "range");
+        add_location(input1, file$1, 266, 8, 9190);
+        attr_dev(p1, "class", "subtitle is-size-6");
+        add_location(p1, file$1, 275, 12, 9464);
+        attr_dev(div3, "class", "column has-text-left");
+        add_location(div3, file$1, 274, 10, 9417);
+        attr_dev(p2, "class", "subtitle is-size-6");
+        add_location(p2, file$1, 278, 12, 9589);
+        attr_dev(div4, "class", "column has-text-right");
+        add_location(div4, file$1, 277, 10, 9541);
+        attr_dev(div5, "class", "columns is-centered");
+        add_location(div5, file$1, 273, 8, 9373);
+        attr_dev(div6, "class", "column is-3 has-text-centered");
+        add_location(div6, file$1, 264, 6, 9043);
+        attr_dev(p3, "class", "has-text-centered is-size-5");
+        add_location(p3, file$1, 283, 8, 9734);
+        attr_dev(input2, "step", "1");
+        attr_dev(input2, "min", "0");
+        attr_dev(input2, "max", "100");
+        attr_dev(input2, "type", "range");
+        add_location(input2, file$1, 284, 8, 9828);
+        attr_dev(p4, "class", "subtitle is-size-6");
+        add_location(p4, file$1, 293, 12, 10108);
+        attr_dev(div7, "class", "column has-text-left");
+        add_location(div7, file$1, 292, 10, 10061);
+        attr_dev(p5, "class", "subtitle is-size-6");
+        add_location(p5, file$1, 296, 12, 10228);
+        attr_dev(div8, "class", "column has-text-right");
+        add_location(div8, file$1, 295, 10, 10180);
+        attr_dev(div9, "class", "columns is-centered");
+        add_location(div9, file$1, 291, 8, 10017);
+        attr_dev(div10, "class", "column is-3 has-text-centered");
+        add_location(div10, file$1, 282, 6, 9682);
+        attr_dev(div11, "class", div11_class_value = ctx.rate ? "columns is-centered" : "columns is-centered");
+        add_location(div11, file$1, 245, 4, 8267);
+        dispose = [listen_dev(input0, "input", ctx.input0_input_handler), listen_dev(input0, "keyup", ctx.keyup_handler, false, false, false), listen_dev(input1, "change", ctx.input1_change_input_handler), listen_dev(input1, "input", ctx.input1_change_input_handler), listen_dev(input1, "click", ctx.click_handler, {
+          once: true
+        }, false, false), listen_dev(input2, "change", ctx.input2_change_input_handler), listen_dev(input2, "input", ctx.input2_change_input_handler), listen_dev(input2, "click", ctx.click_handler_1, {
+          once: true
+        }, false, false)];
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, div11, anchor);
+        append_dev(div11, div2);
+        append_dev(div2, div1);
+        append_dev(div1, label);
+        append_dev(div1, t1);
+        append_dev(div1, div0);
+        append_dev(div0, input0);
+        set_input_value(input0, ctx.time);
+        append_dev(div1, t2);
+        if (if_block) if_block.m(div1, null);
+        append_dev(div11, t3);
+        append_dev(div11, div6);
+        append_dev(div6, p0);
+        append_dev(div6, t5);
+        append_dev(div6, input1);
+        set_input_value(input1, ctx.clarity);
+        append_dev(div6, t6);
+        append_dev(div6, div5);
+        append_dev(div5, div3);
+        append_dev(div3, p1);
+        append_dev(div5, t8);
+        append_dev(div5, div4);
+        append_dev(div4, p2);
+        append_dev(div11, t10);
+        append_dev(div11, div10);
+        append_dev(div10, p3);
+        append_dev(div10, t12);
+        append_dev(div10, input2);
+        set_input_value(input2, ctx.confidence);
+        append_dev(div10, t13);
+        append_dev(div10, div9);
+        append_dev(div9, div7);
+        append_dev(div7, p4);
+        append_dev(div9, t15);
+        append_dev(div9, div8);
+        append_dev(div8, p5);
+      },
+      p: function update(changed, ctx) {
+        if (changed.invalidTime && input0_class_value !== (input0_class_value = ctx.invalidTime ? "input age-input is-danger" : "input age-input")) {
+          attr_dev(input0, "class", input0_class_value);
+        }
+
+        if (changed.time && input0.value !== ctx.time) {
+          set_input_value(input0, ctx.time);
+        }
+
+        if (ctx.invalidTime) {
+          if (!if_block) {
+            if_block = create_if_block_1(ctx);
+            if_block.c();
+            if_block.m(div1, null);
+          }
+        } else if (if_block) {
+          if_block.d(1);
+          if_block = null;
+        }
+
+        if (changed.clarity) {
+          set_input_value(input1, ctx.clarity);
+        }
+
+        if (changed.confidence) {
+          set_input_value(input2, ctx.confidence);
+        }
+
+        if (changed.rate && div11_class_value !== (div11_class_value = ctx.rate ? "columns is-centered" : "columns is-centered")) {
+          attr_dev(div11, "class", div11_class_value);
+        }
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(div11);
+        if (if_block) if_block.d();
+        run_all(dispose);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block$1.name,
+      type: "if",
+      source: "(245:2) {#if rate}",
+      ctx: ctx
+    });
+    return block;
+  } // (327:8) {:else}
+
+
+  function create_else_block_1(ctx) {
     var h2;
     var block = {
       c: function create() {
         h2 = element("h2");
         h2.textContent = "No Thoughts Tagged";
         attr_dev(h2, "class", "title is-4");
-        add_location(h2, file$1, 234, 8, 8117);
+        add_location(h2, file$1, 327, 10, 11300);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h2, anchor);
@@ -51443,16 +51927,16 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_else_block$1.name,
+      id: create_else_block_1.name,
       type: "else",
-      source: "(234:6) {:else}",
+      source: "(327:8) {:else}",
       ctx: ctx
     });
     return block;
-  } // (211:6) {#if segments && segments.length}
+  } // (306:8) {#if segments && segments.length}
 
 
-  function create_if_block$1(ctx) {
+  function create_if_block_2(ctx) {
     var div;
     var table;
     var thead;
@@ -51499,16 +51983,16 @@ var app = (function () {
           each_blocks[_i].c();
         }
 
-        add_location(th0, file$1, 215, 16, 7442);
-        add_location(th1, file$1, 216, 16, 7482);
-        add_location(th2, file$1, 217, 16, 7518);
-        add_location(tr, file$1, 214, 14, 7421);
-        add_location(thead, file$1, 213, 12, 7399);
-        add_location(tbody, file$1, 220, 12, 7589);
-        attr_dev(table, "class", "table is-hoverable svelte-8nkdb");
-        add_location(table, file$1, 212, 10, 7352);
+        add_location(th0, file$1, 310, 18, 10631);
+        add_location(th1, file$1, 311, 18, 10673);
+        add_location(th2, file$1, 312, 18, 10711);
+        add_location(tr, file$1, 309, 16, 10608);
+        add_location(thead, file$1, 308, 14, 10584);
+        add_location(tbody, file$1, 315, 14, 10788);
+        attr_dev(table, "class", "table is-hoverable svelte-1k5bkci");
+        add_location(table, file$1, 307, 12, 10535);
         attr_dev(div, "class", "table-container");
-        add_location(div, file$1, 211, 8, 7312);
+        add_location(div, file$1, 306, 10, 10493);
       },
       m: function mount(target, anchor) {
         insert_dev(target, div, anchor);
@@ -51541,13 +52025,13 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_if_block$1.name,
+      id: create_if_block_2.name,
       type: "if",
-      source: "(211:6) {#if segments && segments.length}",
+      source: "(306:8) {#if segments && segments.length}",
       ctx: ctx
     });
     return block;
-  } // (222:14) {#each segments as segment, i (segment.id)}
+  } // (317:16) {#each segments as segment, i (segment.id)}
 
 
   function create_each_block(key_1, ctx) {
@@ -51581,13 +52065,13 @@ var app = (function () {
         t5 = space();
         attr_dev(td0, "type", "text");
         attr_dev(td0, "class", "segment-id");
-        add_location(td0, file$1, 223, 18, 7737);
+        add_location(td0, file$1, 318, 20, 10942);
         attr_dev(td1, "type", "number");
-        add_location(td1, file$1, 226, 18, 7872);
+        add_location(td1, file$1, 319, 20, 11039);
         attr_dev(td2, "type", "number");
-        add_location(td2, file$1, 227, 18, 7944);
+        add_location(td2, file$1, 320, 20, 11113);
         attr_dev(tr, "class", "table-row");
-        add_location(tr, file$1, 222, 16, 7671);
+        add_location(tr, file$1, 317, 18, 10874);
         dispose = listen_dev(tr, "click", ctx.selectSegment, false, false, false);
         this.first = tr;
       },
@@ -51617,7 +52101,34 @@ var app = (function () {
       block: block,
       id: create_each_block.name,
       type: "each",
-      source: "(222:14) {#each segments as segment, i (segment.id)}",
+      source: "(317:16) {#each segments as segment, i (segment.id)}",
+      ctx: ctx
+    });
+    return block;
+  } // (260:10) {#if invalidTime}
+
+
+  function create_if_block_1(ctx) {
+    var p;
+    var block = {
+      c: function create() {
+        p = element("p");
+        p.textContent = "Invalid timestamp. Please use MM:SS format.";
+        attr_dev(p, "class", "help is-danger");
+        add_location(p, file$1, 260, 12, 8919);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, p, anchor);
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(p);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block_1.name,
+      type: "if",
+      source: "(260:10) {#if invalidTime}",
       ctx: ctx
     });
     return block;
@@ -51625,8 +52136,8 @@ var app = (function () {
 
   function create_fragment$1(ctx) {
     var div8;
-    var div5;
-    var div4;
+    var div2;
+    var div1;
     var h1;
     var t0;
     var t1;
@@ -51634,43 +52145,39 @@ var app = (function () {
     var t3;
     var div0;
     var t4;
+    var div7;
+    var div6;
+    var div5;
     var div3;
-    var div1;
     var audio;
     var source;
     var source_src_value;
     var t5;
     var t6;
-    var div2;
-    var button0;
-    var t8;
-    var button1;
-    var t10;
-    var button2;
-    var t11;
-    var button2_class_value;
-    var t12;
-    var button3;
-    var t13;
-    var button3_class_value;
-    var t14;
-    var div7;
-    var div6;
-    var dispose;
-    var if_block0 = ctx.peaksLoading && create_if_block_1(ctx);
+    var div4;
+    var t7;
+    var if_block0 = ctx.peaksLoading && create_if_block_4(ctx);
 
     function select_block_type(changed, ctx) {
-      if (ctx.segments && ctx.segments.length) return create_if_block$1;
-      return create_else_block$1;
+      if (ctx.rate) return create_if_block_3;
+      return create_else_block_2;
     }
 
     var current_block_type = select_block_type(null, ctx);
     var if_block1 = current_block_type(ctx);
+
+    function select_block_type_1(changed, ctx) {
+      if (ctx.rate) return create_if_block$1;
+      return create_else_block$1;
+    }
+
+    var current_block_type_1 = select_block_type_1(null, ctx);
+    var if_block2 = current_block_type_1(ctx);
     var block = {
       c: function create() {
         div8 = element("div");
-        div5 = element("div");
-        div4 = element("div");
+        div2 = element("div");
+        div1 = element("div");
         h1 = element("h1");
         t0 = text("Recording #");
         t1 = text(ctx.currentTrial);
@@ -51679,108 +52186,81 @@ var app = (function () {
         t3 = space();
         div0 = element("div");
         t4 = space();
+        div7 = element("div");
+        div6 = element("div");
+        div5 = element("div");
         div3 = element("div");
-        div1 = element("div");
         audio = element("audio");
         source = element("source");
         t5 = text("\n            Your browser does not support the audio element.");
         t6 = space();
-        div2 = element("div");
-        button0 = element("button");
-        button0.textContent = "Tag Thought";
-        t8 = space();
-        button1 = element("button");
-        button1.textContent = "Finished";
-        t10 = space();
-        button2 = element("button");
-        t11 = text("Play Thought");
-        t12 = space();
-        button3 = element("button");
-        t13 = text("Delete Segment");
-        t14 = space();
-        div7 = element("div");
-        div6 = element("div");
+        div4 = element("div");
         if_block1.c();
+        t7 = space();
+        if_block2.c();
         attr_dev(h1, "class", "title");
-        add_location(h1, file$1, 174, 6, 5907);
+        add_location(h1, file$1, 200, 6, 6574);
         attr_dev(div0, "id", "waveform-container");
-        add_location(div0, file$1, 178, 6, 6052);
+        add_location(div0, file$1, 205, 6, 6797);
+        attr_dev(div1, "class", "column is-three-quarters has-text-centered");
+        add_location(div1, file$1, 199, 4, 6511);
+        attr_dev(div2, "class", "columns is-centered");
+        add_location(div2, file$1, 198, 2, 6473);
         if (source.src !== (source_src_value = ctx.src)) attr_dev(source, "src", source_src_value);
         attr_dev(source, "type", "audio/wav");
-        add_location(source, file$1, 182, 12, 6217);
+        add_location(source, file$1, 213, 12, 7061);
         attr_dev(audio, "id", "audio");
         audio.controls = "controls";
-        add_location(audio, file$1, 181, 10, 6166);
-        attr_dev(div1, "class", "column is-one-quarter");
-        add_location(div1, file$1, 180, 8, 6120);
-        attr_dev(button0, "class", "button is-primary is-large");
-        add_location(button0, file$1, 187, 10, 6397);
-        attr_dev(button1, "class", "button is-info is-large");
-        add_location(button1, file$1, 190, 10, 6517);
-        attr_dev(button2, "class", button2_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-success is-large" : "button is-success is-large hidden") + " svelte-8nkdb"));
-        add_location(button2, file$1, 193, 10, 6627);
-        attr_dev(button3, "class", button3_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-danger is-large" : "button is-danger is-large hidden") + " svelte-8nkdb"));
-        add_location(button3, file$1, 198, 10, 6827);
-        attr_dev(div2, "class", "column is-one-half");
-        add_location(div2, file$1, 186, 8, 6354);
-        attr_dev(div3, "class", "columns");
-        add_location(div3, file$1, 179, 6, 6090);
-        attr_dev(div4, "class", "column is-three-quarters");
-        add_location(div4, file$1, 173, 4, 5862);
-        attr_dev(div5, "class", "columns is-centered");
-        add_location(div5, file$1, 172, 2, 5824);
-        attr_dev(div6, "class", "column is-three-quarters has-text-centered");
-        add_location(div6, file$1, 209, 4, 7207);
+        add_location(audio, file$1, 212, 10, 7010);
+        attr_dev(div3, "class", "column is-one-quarter");
+        add_location(div3, file$1, 211, 8, 6964);
+        attr_dev(div4, "class", "column is-one-half");
+        add_location(div4, file$1, 217, 8, 7198);
+        attr_dev(div5, "class", "columns");
+        add_location(div5, file$1, 210, 6, 6934);
+        attr_dev(div6, "class", "column is-three-quarters");
+        add_location(div6, file$1, 209, 4, 6889);
         attr_dev(div7, "class", "columns is-centered");
-        add_location(div7, file$1, 208, 2, 7169);
-        attr_dev(div8, "class", "container");
-        add_location(div8, file$1, 171, 0, 5798);
-        dispose = [listen_dev(button0, "click", ctx.addSegment, false, false, false), listen_dev(button1, "click", ctx.finish, false, false, false), listen_dev(button2, "click", ctx.playSegment, false, false, false), listen_dev(button3, "click", ctx.deleteSegment, false, false, false)];
+        add_location(div7, file$1, 208, 2, 6851);
+        attr_dev(div8, "class", "container is-fluid");
+        add_location(div8, file$1, 197, 0, 6438);
       },
       l: function claim(nodes) {
         throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
       },
       m: function mount(target, anchor) {
         insert_dev(target, div8, anchor);
-        append_dev(div8, div5);
-        append_dev(div5, div4);
-        append_dev(div4, h1);
+        append_dev(div8, div2);
+        append_dev(div2, div1);
+        append_dev(div1, h1);
         append_dev(h1, t0);
         append_dev(h1, t1);
-        append_dev(div4, t2);
-        if (if_block0) if_block0.m(div4, null);
-        append_dev(div4, t3);
-        append_dev(div4, div0);
-        append_dev(div4, t4);
-        append_dev(div4, div3);
-        append_dev(div3, div1);
-        append_dev(div1, audio);
-        append_dev(audio, source);
-        append_dev(audio, t5);
-        append_dev(div3, t6);
-        append_dev(div3, div2);
-        append_dev(div2, button0);
-        append_dev(div2, t8);
-        append_dev(div2, button1);
-        append_dev(div2, t10);
-        append_dev(div2, button2);
-        append_dev(button2, t11);
-        append_dev(div2, t12);
-        append_dev(div2, button3);
-        append_dev(button3, t13);
-        append_dev(div8, t14);
+        append_dev(div1, t2);
+        if (if_block0) if_block0.m(div1, null);
+        append_dev(div1, t3);
+        append_dev(div1, div0);
+        append_dev(div8, t4);
         append_dev(div8, div7);
         append_dev(div7, div6);
-        if_block1.m(div6, null);
+        append_dev(div6, div5);
+        append_dev(div5, div3);
+        append_dev(div3, audio);
+        append_dev(audio, source);
+        append_dev(audio, t5);
+        append_dev(div5, t6);
+        append_dev(div5, div4);
+        if_block1.m(div4, null);
+        append_dev(div8, t7);
+        if_block2.m(div8, null);
       },
       p: function update(changed, ctx) {
         if (changed.currentTrial) set_data_dev(t1, ctx.currentTrial);
 
         if (ctx.peaksLoading) {
           if (!if_block0) {
-            if_block0 = create_if_block_1(ctx);
+            if_block0 = create_if_block_4(ctx);
             if_block0.c();
-            if_block0.m(div4, t3);
+            if_block0.m(div1, t3);
           }
         } else if (if_block0) {
           if_block0.d(1);
@@ -51791,14 +52271,6 @@ var app = (function () {
           attr_dev(source, "src", source_src_value);
         }
 
-        if (changed.rowSelected && button2_class_value !== (button2_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-success is-large" : "button is-success is-large hidden") + " svelte-8nkdb"))) {
-          attr_dev(button2, "class", button2_class_value);
-        }
-
-        if (changed.rowSelected && button3_class_value !== (button3_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-danger is-large" : "button is-danger is-large hidden") + " svelte-8nkdb"))) {
-          attr_dev(button3, "class", button3_class_value);
-        }
-
         if (current_block_type === (current_block_type = select_block_type(changed, ctx)) && if_block1) {
           if_block1.p(changed, ctx);
         } else {
@@ -51807,7 +52279,19 @@ var app = (function () {
 
           if (if_block1) {
             if_block1.c();
-            if_block1.m(div6, null);
+            if_block1.m(div4, null);
+          }
+        }
+
+        if (current_block_type_1 === (current_block_type_1 = select_block_type_1(changed, ctx)) && if_block2) {
+          if_block2.p(changed, ctx);
+        } else {
+          if_block2.d(1);
+          if_block2 = current_block_type_1(ctx);
+
+          if (if_block2) {
+            if_block2.c();
+            if_block2.m(div8, null);
           }
         }
       },
@@ -51817,7 +52301,7 @@ var app = (function () {
         if (detaching) detach_dev(div8);
         if (if_block0) if_block0.d();
         if_block1.d();
-        run_all(dispose);
+        if_block2.d();
       }
     };
     dispatch_dev("SvelteRegisterBlock", {
@@ -51852,6 +52336,26 @@ var app = (function () {
     var segmentPrevMax = 0;
     var dispatch = createEventDispatcher();
     var peaksLoading = true;
+    var rate = false;
+    var confidence = 50;
+    var clarity = 50;
+    var clarityRated = false;
+    var confidenceRated = false;
+    var time = "";
+    var timer;
+    var invalidTime = false;
+
+    var debounce = function debounce(v) {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        if (time.length === 5 && time.includes(":") || !time) {
+          $$invalidate("invalidTime", invalidTime = false);
+        } else {
+          $$invalidate("invalidTime", invalidTime = true);
+        }
+      }, 600);
+    };
+
     onMount(function () {
       var options = {
         container: document.getElementById("waveform-container"),
@@ -51886,27 +52390,13 @@ var app = (function () {
     });
 
     var finish = function finish() {
-      var _doc, toSave, doc;
+      var _doc;
 
+      var toSave, doc;
       return regeneratorRuntime.async(function finish$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
-              if (!segments) {
-                _context.next = 19;
-                break;
-              }
-
-              if (!(segments.length < 2)) {
-                _context.next = 5;
-                break;
-              }
-
-              alert("Please tag a few more thoughts");
-              _context.next = 19;
-              break;
-
-            case 5:
               toSave = {};
               segments.forEach(function (obj) {
                 toSave[obj._id] = {
@@ -51916,33 +52406,44 @@ var app = (function () {
               });
               doc = (_doc = {}, _defineProperty(_doc, "trial_".concat(currentTrial), {
                 subject: subjectId,
-                character: character,
+                character: character.slice(0, character.length - 4),
+                clarity: clarity,
+                confidence: confidence,
+                recordingLength: time,
                 thoughts: toSave
               }), _defineProperty(_doc, "currentTrial", currentTrial + 1), _doc);
-              _context.prev = 8;
-              _context.next = 11;
+              _context.prev = 3;
+              _context.next = 6;
               return regeneratorRuntime.awrap(db$1.collection("participants").doc(params.workerId).set(doc, {
                 merge: true
               }));
 
-            case 11:
+            case 6:
               console.log("document added successfully");
               peaksInstance.destroy();
               dispatch("next");
-              _context.next = 19;
+              _context.next = 14;
               break;
 
-            case 16:
-              _context.prev = 16;
-              _context.t0 = _context["catch"](8);
+            case 11:
+              _context.prev = 11;
+              _context.t0 = _context["catch"](3);
               console.error(_context.t0);
 
-            case 19:
+            case 14:
             case "end":
               return _context.stop();
           }
         }
-      }, null, null, [[8, 16]]);
+      }, null, null, [[3, 11]]);
+    };
+
+    var makeRatings = function makeRatings() {
+      if (!segments || segments && segments.length <= 2) {
+        alert("Please tag a few more thoughts");
+      } else {
+        $$invalidate("rate", rate = !rate);
+      }
     };
 
     function addSegment() {
@@ -52060,6 +52561,33 @@ var app = (function () {
       if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1.warn("<TagThought> was created with unknown prop '".concat(key, "'"));
     });
 
+    function input0_input_handler() {
+      time = this.value;
+      $$invalidate("time", time);
+    }
+
+    var keyup_handler = function keyup_handler(ev) {
+      return debounce(ev.target.value);
+    };
+
+    function input1_change_input_handler() {
+      clarity = to_number(this.value);
+      $$invalidate("clarity", clarity);
+    }
+
+    var click_handler = function click_handler() {
+      return $$invalidate("clarityRated", clarityRated = true);
+    };
+
+    function input2_change_input_handler() {
+      confidence = to_number(this.value);
+      $$invalidate("confidence", confidence);
+    }
+
+    var click_handler_1 = function click_handler_1() {
+      return $$invalidate("confidenceRated", confidenceRated = true);
+    };
+
     $$self.$set = function ($$props) {
       if ("src" in $$props) $$invalidate("src", src = $$props.src);
       if ("currentTrial" in $$props) $$invalidate("currentTrial", currentTrial = $$props.currentTrial);
@@ -52078,7 +52606,17 @@ var app = (function () {
         selectedSegmentId: selectedSegmentId,
         rowSelected: rowSelected,
         segmentPrevMax: segmentPrevMax,
-        peaksLoading: peaksLoading
+        peaksLoading: peaksLoading,
+        rate: rate,
+        confidence: confidence,
+        clarity: clarity,
+        clarityRated: clarityRated,
+        confidenceRated: confidenceRated,
+        time: time,
+        timer: timer,
+        invalidTime: invalidTime,
+        nextTrialActive: nextTrialActive,
+        ratingActive: ratingActive
       };
     };
 
@@ -52094,6 +52632,37 @@ var app = (function () {
       if ("rowSelected" in $$props) $$invalidate("rowSelected", rowSelected = $$props.rowSelected);
       if ("segmentPrevMax" in $$props) segmentPrevMax = $$props.segmentPrevMax;
       if ("peaksLoading" in $$props) $$invalidate("peaksLoading", peaksLoading = $$props.peaksLoading);
+      if ("rate" in $$props) $$invalidate("rate", rate = $$props.rate);
+      if ("confidence" in $$props) $$invalidate("confidence", confidence = $$props.confidence);
+      if ("clarity" in $$props) $$invalidate("clarity", clarity = $$props.clarity);
+      if ("clarityRated" in $$props) $$invalidate("clarityRated", clarityRated = $$props.clarityRated);
+      if ("confidenceRated" in $$props) $$invalidate("confidenceRated", confidenceRated = $$props.confidenceRated);
+      if ("time" in $$props) $$invalidate("time", time = $$props.time);
+      if ("timer" in $$props) timer = $$props.timer;
+      if ("invalidTime" in $$props) $$invalidate("invalidTime", invalidTime = $$props.invalidTime);
+      if ("nextTrialActive" in $$props) $$invalidate("nextTrialActive", nextTrialActive = $$props.nextTrialActive);
+      if ("ratingActive" in $$props) $$invalidate("ratingActive", ratingActive = $$props.ratingActive);
+    };
+
+    var nextTrialActive;
+    var ratingActive;
+
+    $$self.$$.update = function () {
+      var changed = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {
+        clarityRated: 1,
+        confidenceRated: 1,
+        time: 1,
+        invalidTime: 1,
+        segments: 1
+      };
+
+      if (changed.clarityRated || changed.confidenceRated || changed.time || changed.invalidTime) {
+         $$invalidate("nextTrialActive", nextTrialActive = !(clarityRated && confidenceRated && time && !invalidTime));
+      }
+
+      if (changed.segments) {
+         $$invalidate("ratingActive", ratingActive = segments.length === 0);
+      }
     };
 
     return {
@@ -52103,11 +52672,28 @@ var app = (function () {
       segments: segments,
       rowSelected: rowSelected,
       peaksLoading: peaksLoading,
+      rate: rate,
+      confidence: confidence,
+      clarity: clarity,
+      clarityRated: clarityRated,
+      confidenceRated: confidenceRated,
+      time: time,
+      invalidTime: invalidTime,
+      debounce: debounce,
       finish: finish,
+      makeRatings: makeRatings,
       addSegment: addSegment,
       selectSegment: selectSegment,
       playSegment: playSegment,
-      deleteSegment: deleteSegment
+      deleteSegment: deleteSegment,
+      nextTrialActive: nextTrialActive,
+      ratingActive: ratingActive,
+      input0_input_handler: input0_input_handler,
+      keyup_handler: keyup_handler,
+      input1_change_input_handler: input1_change_input_handler,
+      click_handler: click_handler,
+      input2_change_input_handler: input2_change_input_handler,
+      click_handler_1: click_handler_1
     };
   }
 
@@ -52180,8 +52766,125 @@ var app = (function () {
     return TagThought;
   }(SvelteComponentDev);
 
+  var file$2 = "src/components/Loading.svelte";
+
+  function create_fragment$2(ctx) {
+    var div2;
+    var div0;
+    var t;
+    var div1;
+    var h1;
+    var current;
+    var default_slot_template = ctx.$$slots.default;
+    var default_slot = create_slot(default_slot_template, ctx, null);
+    var block = {
+      c: function create() {
+        div2 = element("div");
+        div0 = element("div");
+        t = space();
+        div1 = element("div");
+        h1 = element("h1");
+        if (default_slot) default_slot.c();
+        attr_dev(div0, "class", "loader is-loading svelte-10ue5nm");
+        add_location(div0, file$2, 27, 2, 467);
+        attr_dev(h1, "class", "is-size-3");
+        add_location(h1, file$2, 29, 4, 534);
+        attr_dev(div1, "class", "loading-text svelte-10ue5nm");
+        add_location(div1, file$2, 28, 2, 503);
+        attr_dev(div2, "class", "loader-wrapper svelte-10ue5nm");
+        add_location(div2, file$2, 26, 0, 436);
+      },
+      l: function claim(nodes) {
+        throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, div2, anchor);
+        append_dev(div2, div0);
+        append_dev(div2, t);
+        append_dev(div2, div1);
+        append_dev(div1, h1);
+
+        if (default_slot) {
+          default_slot.m(h1, null);
+        }
+
+        current = true;
+      },
+      p: function update(changed, ctx) {
+        if (default_slot && default_slot.p && changed.$$scope) {
+          default_slot.p(get_slot_changes(default_slot_template, ctx, changed, null), get_slot_context(default_slot_template, ctx, null));
+        }
+      },
+      i: function intro(local) {
+        if (current) return;
+        transition_in(default_slot, local);
+        current = true;
+      },
+      o: function outro(local) {
+        transition_out(default_slot, local);
+        current = false;
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(div2);
+        if (default_slot) default_slot.d(detaching);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_fragment$2.name,
+      type: "component",
+      source: "",
+      ctx: ctx
+    });
+    return block;
+  }
+
+  function instance$2($$self, $$props, $$invalidate) {
+    var _$$props$$$slots = $$props.$$slots,
+        $$slots = _$$props$$$slots === void 0 ? {} : _$$props$$$slots,
+        $$scope = $$props.$$scope;
+
+    $$self.$set = function ($$props) {
+      if ("$$scope" in $$props) $$invalidate("$$scope", $$scope = $$props.$$scope);
+    };
+
+    $$self.$capture_state = function () {
+      return {};
+    };
+
+    $$self.$inject_state = function ($$props) {};
+
+    return {
+      $$slots: $$slots,
+      $$scope: $$scope
+    };
+  }
+
+  var Loading =
+  /*#__PURE__*/
+  function (_SvelteComponentDev) {
+    _inherits(Loading, _SvelteComponentDev);
+
+    function Loading(options) {
+      var _this;
+
+      _classCallCheck(this, Loading);
+
+      _this = _possibleConstructorReturn(this, _getPrototypeOf(Loading).call(this, options));
+      init(_assertThisInitialized(_this), options, instance$2, create_fragment$2, safe_not_equal, {});
+      dispatch_dev("SvelteRegisterComponent", {
+        component: _assertThisInitialized(_this),
+        tagName: "Loading",
+        options: options,
+        id: create_fragment$2.name
+      });
+      return _this;
+    }
+
+    return Loading;
+  }(SvelteComponentDev);
+
   var console_1$1 = globals.console;
-  var file$2 = "src/pages/Experiment.svelte"; // (1:0) <script>   // This is the main experiment page. It takes as input trialOrder, which gets passed in from App.svelte, which itself gets it from firebase. Then it looks at the current trial number the participant is on, gets the audio file URL and passes that info as parameters to the TagThought component.   import { createEventDispatcher }
 
   function create_catch_block(ctx) {
     var block = {
@@ -52200,7 +52903,7 @@ var app = (function () {
       ctx: ctx
     });
     return block;
-  } // (57:0) {:then src}
+  } // (56:0) {:then src}
 
 
   function create_then_block(ctx) {
@@ -52246,43 +52949,94 @@ var app = (function () {
       block: block,
       id: create_then_block.name,
       type: "then",
-      source: "(57:0) {:then src}",
+      source: "(56:0) {:then src}",
       ctx: ctx
     });
     return block;
-  } // (55:20)    <h3 class="title is-3">Preparing Trial...</h3> {:then src}
+  } // (54:20)    <Loading>Preparing Recording...</Loading> {:then src}
 
 
   function create_pending_block(ctx) {
-    var h3;
+    var current;
+    var loading = new Loading({
+      props: {
+        $$slots: {
+          default: [create_default_slot]
+        },
+        $$scope: {
+          ctx: ctx
+        }
+      },
+      $$inline: true
+    });
     var block = {
       c: function create() {
-        h3 = element("h3");
-        h3.textContent = "Preparing Trial...";
-        attr_dev(h3, "class", "title is-3");
-        add_location(h3, file$2, 55, 2, 1995);
+        create_component(loading.$$.fragment);
       },
       m: function mount(target, anchor) {
-        insert_dev(target, h3, anchor);
+        mount_component(loading, target, anchor);
+        current = true;
       },
-      p: noop,
-      i: noop,
-      o: noop,
+      p: function update(changed, ctx) {
+        var loading_changes = {};
+
+        if (changed.$$scope) {
+          loading_changes.$$scope = {
+            changed: changed,
+            ctx: ctx
+          };
+        }
+
+        loading.$set(loading_changes);
+      },
+      i: function intro(local) {
+        if (current) return;
+        transition_in(loading.$$.fragment, local);
+        current = true;
+      },
+      o: function outro(local) {
+        transition_out(loading.$$.fragment, local);
+        current = false;
+      },
       d: function destroy(detaching) {
-        if (detaching) detach_dev(h3);
+        destroy_component(loading, detaching);
       }
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
       id: create_pending_block.name,
       type: "pending",
-      source: "(55:20)    <h3 class=\\\"title is-3\\\">Preparing Trial...</h3> {:then src}",
+      source: "(54:20)    <Loading>Preparing Recording...</Loading> {:then src}",
+      ctx: ctx
+    });
+    return block;
+  } // (55:2) <Loading>
+
+
+  function create_default_slot(ctx) {
+    var t;
+    var block = {
+      c: function create() {
+        t = text("Preparing Recording...");
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, t, anchor);
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(t);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_default_slot.name,
+      type: "slot",
+      source: "(55:2) <Loading>",
       ctx: ctx
     });
     return block;
   }
 
-  function create_fragment$2(ctx) {
+  function create_fragment$3(ctx) {
     var await_block_anchor;
     var promise;
     var current;
@@ -52347,7 +53101,7 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_fragment$2.name,
+      id: create_fragment$3.name,
       type: "component",
       source: "",
       ctx: ctx
@@ -52355,7 +53109,7 @@ var app = (function () {
     return block;
   }
 
-  function instance$2($$self, $$props, $$invalidate) {
+  function instance$3($$self, $$props, $$invalidate) {
     var trialOrder = $$props.trialOrder;
     var currentTrial;
     var fileName;
@@ -52477,14 +53231,14 @@ var app = (function () {
       _classCallCheck(this, Experiment);
 
       _this = _possibleConstructorReturn(this, _getPrototypeOf(Experiment).call(this, options));
-      init(_assertThisInitialized(_this), options, instance$2, create_fragment$2, safe_not_equal, {
+      init(_assertThisInitialized(_this), options, instance$3, create_fragment$3, safe_not_equal, {
         trialOrder: 0
       });
       dispatch_dev("SvelteRegisterComponent", {
         component: _assertThisInitialized(_this),
         tagName: "Experiment",
         options: options,
-        id: create_fragment$2.name
+        id: create_fragment$3.name
       });
       var ctx = _this.$$.ctx;
       var props = options.props || {};
@@ -52511,7 +53265,7 @@ var app = (function () {
 
   var file$3 = "src/pages/Debrief.svelte";
 
-  function create_fragment$3(ctx) {
+  function create_fragment$4(ctx) {
     var div21;
     var div20;
     var div19;
@@ -52789,7 +53543,7 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_fragment$3.name,
+      id: create_fragment$4.name,
       type: "component",
       source: "",
       ctx: ctx
@@ -52797,7 +53551,7 @@ var app = (function () {
     return block;
   }
 
-  function instance$3($$self, $$props, $$invalidate) {
+  function instance$4($$self, $$props, $$invalidate) {
     var age = "";
     var feedback = "";
     var sex = "";
@@ -52893,12 +53647,12 @@ var app = (function () {
       _classCallCheck(this, Debrief);
 
       _this = _possibleConstructorReturn(this, _getPrototypeOf(Debrief).call(this, options));
-      init(_assertThisInitialized(_this), options, instance$3, create_fragment$3, safe_not_equal, {});
+      init(_assertThisInitialized(_this), options, instance$4, create_fragment$4, safe_not_equal, {});
       dispatch_dev("SvelteRegisterComponent", {
         component: _assertThisInitialized(_this),
         tagName: "Debrief",
         options: options,
-        id: create_fragment$3.name
+        id: create_fragment$4.name
       });
       return _this;
     }
@@ -52906,9 +53660,9 @@ var app = (function () {
     return Debrief;
   }(SvelteComponentDev);
 
-  var file$4 = "src/App.svelte"; // (73:39) 
+  var file$4 = "src/App.svelte"; // (77:39) 
 
-  function create_if_block_2(ctx) {
+  function create_if_block_3$1(ctx) {
     var current;
     var debrief = new Debrief({
       $$inline: true
@@ -52937,16 +53691,16 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_if_block_2.name,
+      id: create_if_block_3$1.name,
       type: "if",
-      source: "(73:39) ",
+      source: "(77:39) ",
       ctx: ctx
     });
     return block;
-  } // (71:42) 
+  } // (75:42) 
 
 
-  function create_if_block_1$1(ctx) {
+  function create_if_block_2$1(ctx) {
     var current;
     var experiment = new Experiment({
       props: {
@@ -52983,16 +53737,16 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_if_block_1$1.name,
+      id: create_if_block_2$1.name,
       type: "if",
-      source: "(71:42) ",
+      source: "(75:42) ",
       ctx: ctx
     });
     return block;
-  } // (67:2) {#if currentState === 'instructions'}
+  } // (71:44) 
 
 
-  function create_if_block$2(ctx) {
+  function create_if_block_1$1(ctx) {
     var current;
     var instructions = new Instructions({
       $$inline: true
@@ -53022,26 +53776,108 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
+      id: create_if_block_1$1.name,
+      type: "if",
+      source: "(71:44) ",
+      ctx: ctx
+    });
+    return block;
+  } // (69:2) {#if !currentState}
+
+
+  function create_if_block$2(ctx) {
+    var current;
+    var loading = new Loading({
+      props: {
+        $$slots: {
+          default: [create_default_slot$1]
+        },
+        $$scope: {
+          ctx: ctx
+        }
+      },
+      $$inline: true
+    });
+    var block = {
+      c: function create() {
+        create_component(loading.$$.fragment);
+      },
+      m: function mount(target, anchor) {
+        mount_component(loading, target, anchor);
+        current = true;
+      },
+      p: function update(changed, ctx) {
+        var loading_changes = {};
+
+        if (changed.$$scope) {
+          loading_changes.$$scope = {
+            changed: changed,
+            ctx: ctx
+          };
+        }
+
+        loading.$set(loading_changes);
+      },
+      i: function intro(local) {
+        if (current) return;
+        transition_in(loading.$$.fragment, local);
+        current = true;
+      },
+      o: function outro(local) {
+        transition_out(loading.$$.fragment, local);
+        current = false;
+      },
+      d: function destroy(detaching) {
+        destroy_component(loading, detaching);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
       id: create_if_block$2.name,
       type: "if",
-      source: "(67:2) {#if currentState === 'instructions'}",
+      source: "(69:2) {#if !currentState}",
+      ctx: ctx
+    });
+    return block;
+  } // (70:4) <Loading>
+
+
+  function create_default_slot$1(ctx) {
+    var t;
+    var block = {
+      c: function create() {
+        t = text("Loading...");
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, t, anchor);
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(t);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_default_slot$1.name,
+      type: "slot",
+      source: "(70:4) <Loading>",
       ctx: ctx
     });
     return block;
   }
 
-  function create_fragment$4(ctx) {
+  function create_fragment$5(ctx) {
     var section;
     var current_block_type_index;
     var if_block;
     var current;
-    var if_block_creators = [create_if_block$2, create_if_block_1$1, create_if_block_2];
+    var if_block_creators = [create_if_block$2, create_if_block_1$1, create_if_block_2$1, create_if_block_3$1];
     var if_blocks = [];
 
     function select_block_type(changed, ctx) {
-      if (ctx.currentState === "instructions") return 0;
-      if (ctx.currentState === "experiment") return 1;
-      if (ctx.currentState === "debrief") return 2;
+      if (!ctx.currentState) return 0;
+      if (ctx.currentState === "instructions") return 1;
+      if (ctx.currentState === "experiment") return 2;
+      if (ctx.currentState === "debrief") return 3;
       return -1;
     }
 
@@ -53054,7 +53890,7 @@ var app = (function () {
         section = element("section");
         if (if_block) if_block.c();
         attr_dev(section, "class", "section");
-        add_location(section, file$4, 65, 0, 2846);
+        add_location(section, file$4, 67, 0, 2940);
       },
       l: function claim(nodes) {
         throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -53119,7 +53955,7 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_fragment$4.name,
+      id: create_fragment$5.name,
       type: "component",
       source: "",
       ctx: ctx
@@ -53127,7 +53963,7 @@ var app = (function () {
     return block;
   }
 
-  function instance$4($$self, $$props, $$invalidate) {
+  function instance$5($$self, $$props, $$invalidate) {
     var currentState;
     var trialOrder = ["s01_BuddyGarrity.wav", "s01_CoachTaylor.wav"];
     fisherYatesShuffle(trialOrder);
@@ -53164,7 +54000,7 @@ var app = (function () {
       }, null, null, [[1, 7]]);
     };
 
-    (function _callee() {
+    onMount(function _callee() {
       var resp, data;
       return regeneratorRuntime.async(function _callee$(_context2) {
         while (1) {
@@ -53220,7 +54056,7 @@ var app = (function () {
           }
         }
       }, null, null, [[0, 17]]);
-    })();
+    });
 
     var finished_handler = function finished_handler() {
       return updateState("experiment");
@@ -53259,12 +54095,12 @@ var app = (function () {
       _classCallCheck(this, App);
 
       _this = _possibleConstructorReturn(this, _getPrototypeOf(App).call(this, options));
-      init(_assertThisInitialized(_this), options, instance$4, create_fragment$4, safe_not_equal, {});
+      init(_assertThisInitialized(_this), options, instance$5, create_fragment$5, safe_not_equal, {});
       dispatch_dev("SvelteRegisterComponent", {
         component: _assertThisInitialized(_this),
         tagName: "App",
         options: options,
-        id: create_fragment$4.name
+        id: create_fragment$5.name
       });
       return _this;
     }

@@ -14,4 +14,6 @@
   "editor.formatOnSave": true,
   "svelte.plugin.typescript.enable": false,
   "javascript.preferences.quoteStyle": "single",
+  "editor.wordWrap": "wordWrapColumn",
+  "editor.wordWrapColumn": 100
 }

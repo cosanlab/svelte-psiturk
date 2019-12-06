@@ -1,10 +1,12 @@
 <script>
   // This is the main Svelte component that will display after a user provides conset within PsiTurk. It serves two main purposes: 1) it initializes a new entry into the firebase database if a workerId from the URL is not found or retrieves an existing record if a workerId is found. Creating a new entry sets up the random trial order the participant will receive for all the recordings. 2) it uses that information to dynamically render different experiment states based upon what a user does i.e. show instructions, show quiz, show experiment, show exit survey. Each of those different states exist as their own .svelte files within the pages/ folder
+  import { onMount } from 'svelte';
   import { db, params, fisherYatesShuffle } from './utils.js';
   import Instructions from './pages/Instructions.svelte';
   // import Quiz from './pages/Quiz.svelte';
   import Experiment from './pages/Experiment.svelte';
   import Debrief from './pages/Debrief.svelte';
+  import Loading from './components/Loading.svelte';
 
   // Local variable that's synced to firebase
   let currentState;
@@ -30,7 +32,7 @@
   };
 
   // Before we render anything see if we have a db entry for this subject based upon the URL parameters. If not create an entry with a new random stimulus order and put them into the instructions state. If we do, load their trial order and current experiment state
-  (async () => {
+  onMount(async () => {
     try {
       const resp = await db
         .collection('participants')
@@ -60,11 +62,13 @@
     } catch (error) {
       console.error(error);
     }
-  })();
+  });
 </script>
 
 <section class="section">
-  {#if currentState === 'instructions'}
+  {#if !currentState}
+    <Loading>Loading...</Loading>
+  {:else if currentState === 'instructions'}
     <!-- Listen for when the instructions page dispatches "finished" and call updateState when it does-->
     <!-- TODO: Instructions should go to quiz rather than experiment, afer we finish making the quiz page -->
     <Instructions on:finished={() => updateState('experiment')} />
