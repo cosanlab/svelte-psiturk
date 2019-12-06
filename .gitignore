@@ -4,3 +4,4 @@ participants.db
 .psiturk_history
 *.DS*
 __pycache__/
+firebase_seed.json

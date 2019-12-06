@@ -13,6 +13,8 @@
 
   // Setup a random trial order
   // TODO: Add the full list of file names we want to use here
+  // TODO: Create a separate db for stimuli to track how many HITs we have for each one then
+  // TODO: setup random sampling from firebase to get files that have the least number of responses across participants
   let trialOrder = ['s01_BuddyGarrity.wav', 's01_CoachTaylor.wav'];
   fisherYatesShuffle(trialOrder);
 

@@ -11,6 +11,7 @@ This project scaffold uses [SvelteJS](https://svelte.dev/) as a frontend UI + [P
 - [Deploying Live](#deploying-live)
 - [Application Structure](#application-structure)
     - [Data management](#data-management)
+    - [Seeding database](#seeding-database)
 
 # Getting Started
 
@@ -62,3 +63,12 @@ PsiTurk responsibilities are outlined in purple and are primarily concerned with
 All data is stored in firebase database including participant responses, what trial they're currently on, and application state (i.e. whether a participant is viewing the instructions, completing the experiment, doing the debrief, etc). 
 
 All stimuli are stored in firebase storage and accessed directly to make it easy to render audio files in HTML with fixed URLs.
+
+## Seeding Database
+
+Within firebase is a collection called `recordings` that contains all unique stimuli to be sampled from for each Turker. To replace this collection use the following commands, which were used to initially seed the database:  
+
+1. `python generate_firebase_seed.py folder/path/containing/.wav/files`
+    - This will generate a `firebase_seed.json` file in this root directory of this repository
+2. `node seed_firebase.js`
+    - This will insert each entry in `firebase_seed.json` into the `recordings` collection printing out the document id if insertion occurs without errors
