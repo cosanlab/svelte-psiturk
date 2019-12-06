@@ -2,6 +2,7 @@
 import firebase from 'firebase/app';
 import 'firebase/firestore';
 import 'firebase/storage';
+import 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBSDQTQrnklilGdmyZcEXMGhIwg0dFpNlY',
@@ -18,6 +19,7 @@ firebase.initializeApp(firebaseConfig);
 // Export firebase globals for use elsewhere in the app
 export const db = firebase.firestore();
 export const storage = firebase.storage();
+export const auth = firebase.auth();
 
 // Functions to parse the URL to get workerID, hitID, and assignmentID
 const unescapeURL = (s) => decodeURIComponent(s.replace(/\+/g, '%20'));
