@@ -15,8 +15,7 @@
   // TODO: Add the full list of file names we want to use here
   // TODO: Create a separate db for stimuli to track how many HITs we have for each one then
   // TODO: setup random sampling from firebase to get files that have the least number of responses across participants
-  let trialOrder = ['s01_BuddyGarrity.wav', 's01_CoachTaylor.wav'];
-  fisherYatesShuffle(trialOrder);
+  let trialOrder = [];
 
   // This function updates the current state of the user to dynamically render different parts of the experiment (i.e. instructions, quiz, etc)
   const updateState = async (newState) => {
@@ -46,6 +45,15 @@
         trialOrder = data.trialOrder;
         console.log('user found...loading state');
       } else {
+        const query = await db
+          .collection('recordings')
+          .orderBy('responses')
+          .limit(10)
+          .get();
+        query.forEach((doc) => {
+          trialOrder.push(doc.data().name);
+        });
+        fisherYatesShuffle(trialOrder);
         await db
           .collection('participants')
           .doc(params.workerId)
