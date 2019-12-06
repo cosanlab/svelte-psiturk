@@ -4214,12 +4214,26 @@ var app = (function () {
     };
   }
 
+  function prevent_default(fn) {
+    return function (event) {
+      event.preventDefault(); // @ts-ignore
+
+      return fn.call(this, event);
+    };
+  }
+
   function attr(node, attribute, value) {
     if (value == null) node.removeAttribute(attribute);else if (node.getAttribute(attribute) !== value) node.setAttribute(attribute, value);
   }
 
   function children(element) {
     return Array.from(element.childNodes);
+  }
+
+  function set_input_value(input, value) {
+    if (value != null || input.value) {
+      input.value = value;
+    }
   }
 
   function custom_event(type, detail) {
@@ -6704,7 +6718,7 @@ var app = (function () {
   exports.validateCallback = validateCallback;
   exports.validateContextObject = validateContextObject;
   exports.validateNamespace = validateNamespace;
-
+  //# sourceMappingURL=index.cjs.js.map
   });
 
   unwrapExports(index_cjs);
@@ -6966,6 +6980,7 @@ var app = (function () {
           inst.logLevel = level;
       });
   }
+  //# sourceMappingURL=index.esm.js.map
 
   var index_esm = /*#__PURE__*/Object.freeze({
     __proto__: null,
@@ -7548,7 +7563,7 @@ var app = (function () {
 
   exports.default = firebase;
   exports.firebase = firebase;
-
+  //# sourceMappingURL=index.cjs.js.map
   });
 
   var firebase = unwrapExports(index_cjs$1);
@@ -7666,6 +7681,7 @@ var app = (function () {
   */
   Qd.prototype.createWebChannel=Qd.prototype.a;Y.prototype.send=Y.prototype.Xa;Y.prototype.open=Y.prototype.Wa;Y.prototype.close=Y.prototype.close;Pb.NO_ERROR=0;Pb.TIMEOUT=8;Pb.HTTP_ERROR=6;Qb.COMPLETE="complete";Tb.EventType=L;L.OPEN="a";L.CLOSE="b";L.ERROR="c";L.MESSAGE="d";G.prototype.listen=G.prototype.Aa;X.prototype.listenOnce=X.prototype.Ba;X.prototype.getLastError=X.prototype.Ya;X.prototype.getLastErrorCode=X.prototype.ya;X.prototype.getStatus=X.prototype.T;X.prototype.getStatusText=X.prototype.za;
   X.prototype.getResponseJson=X.prototype.Va;X.prototype.getResponseText=X.prototype.aa;X.prototype.send=X.prototype.ca;var tmp={createWebChannelTransport:Td,ErrorCode:Pb,EventType:Qb,WebChannel:Tb,XhrIo:X};
+  //# sourceMappingURL=index.esm.js.map
 
   var index_cjs$3 = createCommonjsModule(function (module, exports) {
 
@@ -31041,7 +31057,7 @@ var app = (function () {
   registerFirestore(firebase);
 
   exports.registerFirestore = registerFirestore;
-
+  //# sourceMappingURL=index.cjs.js.map
   });
 
   unwrapExports(index_cjs$3);
@@ -34601,6 +34617,7 @@ var app = (function () {
       true);
   }
   registerStorage(firebase);
+  //# sourceMappingURL=index.esm.js.map
 
   var firebaseConfig = {
     apiKey: 'AIzaSyBSDQTQrnklilGdmyZcEXMGhIwg0dFpNlY',
@@ -34610,8 +34627,7 @@ var app = (function () {
     storageBucket: 'thought-segmentation.appspot.com',
     messagingSenderId: '456731753647',
     appId: '1:456731753647:web:079b4e850e4c03f2e1a85a'
-  }; // Initialize firebase
-
+  };
   index_cjs$2.initializeApp(firebaseConfig); // Export firebase globals for use elsewhere in the app
 
   var db$1 = index_cjs$2.firestore();
@@ -34642,8 +34658,10 @@ var app = (function () {
     }
 
     return params;
-  }; // Shuffle array elements inplace: https://javascript.info/task/shuffle
+  }; // Use those functions to get the window URL params and make them available throughout the app
 
+
+  var params = getURLParams(); // Shuffle array elements inplace: https://javascript.info/task/shuffle
 
   var fisherYatesShuffle = function fisherYatesShuffle(array) {
     for (var i = array.length - 1; i > 0; i -= 1) {
@@ -34659,9 +34677,7 @@ var app = (function () {
       array[i] = _ref[0];
       array[j] = _ref[1];
     }
-  }; // Get the window URL params and make them available throughout the app
-
-  var params = getURLParams();
+  };
 
   var file = "src/pages/Instructions.svelte"; // (72:14) {:else}
 
@@ -51365,7 +51381,7 @@ var app = (function () {
   }();
   },{}]},{},[70])(70)
   });
-
+  //# sourceMappingURL=peaks.js.map
   });
 
   var Peaks = unwrapExports(peaks);
@@ -51388,7 +51404,7 @@ var app = (function () {
         h3 = element("h3");
         h3.textContent = "Loading audio...";
         attr_dev(h3, "class", "title is-3");
-        add_location(h3, file$1, 176, 8, 5987);
+        add_location(h3, file$1, 176, 8, 5989);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h3, anchor);
@@ -51415,7 +51431,7 @@ var app = (function () {
         h2 = element("h2");
         h2.textContent = "No Thoughts Tagged";
         attr_dev(h2, "class", "title is-4");
-        add_location(h2, file$1, 234, 8, 8115);
+        add_location(h2, file$1, 234, 8, 8117);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h2, anchor);
@@ -51483,16 +51499,16 @@ var app = (function () {
           each_blocks[_i].c();
         }
 
-        add_location(th0, file$1, 215, 16, 7440);
-        add_location(th1, file$1, 216, 16, 7480);
-        add_location(th2, file$1, 217, 16, 7516);
-        add_location(tr, file$1, 214, 14, 7419);
-        add_location(thead, file$1, 213, 12, 7397);
-        add_location(tbody, file$1, 220, 12, 7587);
+        add_location(th0, file$1, 215, 16, 7442);
+        add_location(th1, file$1, 216, 16, 7482);
+        add_location(th2, file$1, 217, 16, 7518);
+        add_location(tr, file$1, 214, 14, 7421);
+        add_location(thead, file$1, 213, 12, 7399);
+        add_location(tbody, file$1, 220, 12, 7589);
         attr_dev(table, "class", "table is-hoverable svelte-8nkdb");
-        add_location(table, file$1, 212, 10, 7350);
+        add_location(table, file$1, 212, 10, 7352);
         attr_dev(div, "class", "table-container");
-        add_location(div, file$1, 211, 8, 7310);
+        add_location(div, file$1, 211, 8, 7312);
       },
       m: function mount(target, anchor) {
         insert_dev(target, div, anchor);
@@ -51565,13 +51581,13 @@ var app = (function () {
         t5 = space();
         attr_dev(td0, "type", "text");
         attr_dev(td0, "class", "segment-id");
-        add_location(td0, file$1, 223, 18, 7735);
+        add_location(td0, file$1, 223, 18, 7737);
         attr_dev(td1, "type", "number");
-        add_location(td1, file$1, 226, 18, 7870);
+        add_location(td1, file$1, 226, 18, 7872);
         attr_dev(td2, "type", "number");
-        add_location(td2, file$1, 227, 18, 7942);
+        add_location(td2, file$1, 227, 18, 7944);
         attr_dev(tr, "class", "table-row");
-        add_location(tr, file$1, 222, 16, 7669);
+        add_location(tr, file$1, 222, 16, 7671);
         dispose = listen_dev(tr, "click", ctx.selectSegment, false, false, false);
         this.first = tr;
       },
@@ -51686,39 +51702,39 @@ var app = (function () {
         div6 = element("div");
         if_block1.c();
         attr_dev(h1, "class", "title");
-        add_location(h1, file$1, 174, 6, 5905);
+        add_location(h1, file$1, 174, 6, 5907);
         attr_dev(div0, "id", "waveform-container");
-        add_location(div0, file$1, 178, 6, 6050);
+        add_location(div0, file$1, 178, 6, 6052);
         if (source.src !== (source_src_value = ctx.src)) attr_dev(source, "src", source_src_value);
         attr_dev(source, "type", "audio/wav");
-        add_location(source, file$1, 182, 12, 6215);
+        add_location(source, file$1, 182, 12, 6217);
         attr_dev(audio, "id", "audio");
         audio.controls = "controls";
-        add_location(audio, file$1, 181, 10, 6164);
+        add_location(audio, file$1, 181, 10, 6166);
         attr_dev(div1, "class", "column is-one-quarter");
-        add_location(div1, file$1, 180, 8, 6118);
+        add_location(div1, file$1, 180, 8, 6120);
         attr_dev(button0, "class", "button is-primary is-large");
-        add_location(button0, file$1, 187, 10, 6395);
+        add_location(button0, file$1, 187, 10, 6397);
         attr_dev(button1, "class", "button is-info is-large");
-        add_location(button1, file$1, 190, 10, 6515);
+        add_location(button1, file$1, 190, 10, 6517);
         attr_dev(button2, "class", button2_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-success is-large" : "button is-success is-large hidden") + " svelte-8nkdb"));
-        add_location(button2, file$1, 193, 10, 6625);
+        add_location(button2, file$1, 193, 10, 6627);
         attr_dev(button3, "class", button3_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-danger is-large" : "button is-danger is-large hidden") + " svelte-8nkdb"));
-        add_location(button3, file$1, 198, 10, 6825);
+        add_location(button3, file$1, 198, 10, 6827);
         attr_dev(div2, "class", "column is-one-half");
-        add_location(div2, file$1, 186, 8, 6352);
+        add_location(div2, file$1, 186, 8, 6354);
         attr_dev(div3, "class", "columns");
-        add_location(div3, file$1, 179, 6, 6088);
+        add_location(div3, file$1, 179, 6, 6090);
         attr_dev(div4, "class", "column is-three-quarters");
-        add_location(div4, file$1, 173, 4, 5860);
+        add_location(div4, file$1, 173, 4, 5862);
         attr_dev(div5, "class", "columns is-centered");
-        add_location(div5, file$1, 172, 2, 5822);
+        add_location(div5, file$1, 172, 2, 5824);
         attr_dev(div6, "class", "column is-three-quarters has-text-centered");
-        add_location(div6, file$1, 209, 4, 7205);
+        add_location(div6, file$1, 209, 4, 7207);
         attr_dev(div7, "class", "columns is-centered");
-        add_location(div7, file$1, 208, 2, 7167);
+        add_location(div7, file$1, 208, 2, 7169);
         attr_dev(div8, "class", "container");
-        add_location(div8, file$1, 171, 0, 5796);
+        add_location(div8, file$1, 171, 0, 5798);
         dispose = [listen_dev(button0, "click", ctx.addSegment, false, false, false), listen_dev(button1, "click", ctx.finish, false, false, false), listen_dev(button2, "click", ctx.playSegment, false, false, false), listen_dev(button3, "click", ctx.deleteSegment, false, false, false)];
       },
       l: function claim(nodes) {
@@ -52165,7 +52181,7 @@ var app = (function () {
   }(SvelteComponentDev);
 
   var console_1$1 = globals.console;
-  var file$2 = "src/pages/Experiment.svelte"; // (1:0) <script>   // This is the main experiment page. It should get the number of trials and audio filepaths from firebase and then create a TagThought component for each one. Currently it just renders a single TagThought component with a hardcoded audio file   import { createEventDispatcher }
+  var file$2 = "src/pages/Experiment.svelte"; // (1:0) <script>   // This is the main experiment page. It takes as input trialOrder, which gets passed in from App.svelte, which itself gets it from firebase. Then it looks at the current trial number the participant is on, gets the audio file URL and passes that info as parameters to the TagThought component.   import { createEventDispatcher }
 
   function create_catch_block(ctx) {
     var block = {
@@ -52180,7 +52196,7 @@ var app = (function () {
       block: block,
       id: create_catch_block.name,
       type: "catch",
-      source: "(1:0) <script>   // This is the main experiment page. It should get the number of trials and audio filepaths from firebase and then create a TagThought component for each one. Currently it just renders a single TagThought component with a hardcoded audio file   import { createEventDispatcher }",
+      source: "(1:0) <script>   // This is the main experiment page. It takes as input trialOrder, which gets passed in from App.svelte, which itself gets it from firebase. Then it looks at the current trial number the participant is on, gets the audio file URL and passes that info as parameters to the TagThought component.   import { createEventDispatcher }",
       ctx: ctx
     });
     return block;
@@ -52244,7 +52260,7 @@ var app = (function () {
         h3 = element("h3");
         h3.textContent = "Preparing Trial...";
         attr_dev(h3, "class", "title is-3");
-        add_location(h3, file$2, 55, 2, 1928);
+        add_location(h3, file$2, 55, 2, 1995);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h3, anchor);
@@ -52496,52 +52512,279 @@ var app = (function () {
   var file$3 = "src/pages/Debrief.svelte";
 
   function create_fragment$3(ctx) {
+    var div21;
+    var div20;
+    var div19;
+    var p0;
+    var t1;
+    var p1;
+    var em;
+    var t3;
+    var form;
+    var div3;
+    var div0;
+    var label0;
+    var t5;
     var div2;
     var div1;
-    var div0;
-    var h1;
-    var t1;
+    var p2;
+    var input0;
+    var t6;
+    var div8;
+    var div4;
+    var label1;
+    var t8;
+    var div7;
+    var div6;
+    var div5;
+    var label2;
+    var input1;
+    var input1_value_value;
+    var t9;
+    var t10;
+    var label3;
+    var input2;
+    var input2_value_value;
+    var t11;
+    var t12;
+    var div13;
+    var div9;
+    var label4;
+    var t14;
+    var div12;
+    var div11;
+    var div10;
+    var textarea;
+    var t15;
+    var div18;
+    var div14;
+    var t16;
+    var div17;
+    var div16;
+    var div15;
     var button;
     var dispose;
     var block = {
       c: function create() {
+        div21 = element("div");
+        div20 = element("div");
+        div19 = element("div");
+        p0 = element("p");
+        p0.textContent = "Thank You For Participating!";
+        t1 = space();
+        p1 = element("p");
+        em = element("em");
+        em.textContent = "All questions are optional";
+        t3 = space();
+        form = element("form");
+        div3 = element("div");
+        div0 = element("div");
+        label0 = element("label");
+        label0.textContent = "Age";
+        t5 = space();
         div2 = element("div");
         div1 = element("div");
-        div0 = element("div");
-        h1 = element("h1");
-        h1.textContent = "Debrief text or survey here";
-        t1 = space();
+        p2 = element("p");
+        input0 = element("input");
+        t6 = space();
+        div8 = element("div");
+        div4 = element("div");
+        label1 = element("label");
+        label1.textContent = "Sex";
+        t8 = space();
+        div7 = element("div");
+        div6 = element("div");
+        div5 = element("div");
+        label2 = element("label");
+        input1 = element("input");
+        t9 = text("\n                  Male");
+        t10 = space();
+        label3 = element("label");
+        input2 = element("input");
+        t11 = text("\n                  Female");
+        t12 = space();
+        div13 = element("div");
+        div9 = element("div");
+        label4 = element("label");
+        label4.textContent = "Feedback";
+        t14 = space();
+        div12 = element("div");
+        div11 = element("div");
+        div10 = element("div");
+        textarea = element("textarea");
+        t15 = space();
+        div18 = element("div");
+        div14 = element("div");
+        t16 = space();
+        div17 = element("div");
+        div16 = element("div");
+        div15 = element("div");
         button = element("button");
         button.textContent = "Submit HIT";
-        attr_dev(h1, "class", "title");
-        add_location(h1, file$3, 16, 6, 583);
+        attr_dev(p0, "class", "title is-3 has-text-centered");
+        add_location(p0, file$3, 42, 6, 986);
+        add_location(em, file$3, 44, 8, 1117);
+        attr_dev(p1, "class", "subtitle is-6 has-text-centered");
+        add_location(p1, file$3, 43, 6, 1065);
+        attr_dev(label0, "class", "label");
+        add_location(label0, file$3, 49, 12, 1314);
+        attr_dev(div0, "class", "field-label is-normal");
+        add_location(div0, file$3, 48, 10, 1266);
+        attr_dev(input0, "class", "input age-input svelte-lbo539");
+        attr_dev(input0, "type", "text");
+        add_location(input0, file$3, 54, 16, 1491);
+        attr_dev(p2, "class", "control");
+        add_location(p2, file$3, 53, 14, 1455);
+        attr_dev(div1, "class", "field");
+        add_location(div1, file$3, 52, 12, 1421);
+        attr_dev(div2, "class", "field-body is-narrow");
+        add_location(div2, file$3, 51, 10, 1374);
+        attr_dev(div3, "class", "field is-horizontal");
+        add_location(div3, file$3, 47, 8, 1222);
+        attr_dev(label1, "class", "label");
+        add_location(label1, file$3, 61, 12, 1714);
+        attr_dev(div4, "class", "field-label");
+        add_location(div4, file$3, 60, 10, 1676);
+        attr_dev(input1, "type", "radio");
+        input1.__value = input1_value_value = "male";
+        input1.value = input1.__value;
+        ctx.$$binding_groups[0].push(input1);
+        add_location(input1, file$3, 67, 18, 1933);
+        attr_dev(label2, "class", "radio");
+        add_location(label2, file$3, 66, 16, 1893);
+        attr_dev(input2, "type", "radio");
+        input2.__value = input2_value_value = "female";
+        input2.value = input2.__value;
+        ctx.$$binding_groups[0].push(input2);
+        add_location(input2, file$3, 71, 18, 2092);
+        attr_dev(label3, "class", "radio");
+        add_location(label3, file$3, 70, 16, 2052);
+        attr_dev(div5, "class", "control");
+        add_location(div5, file$3, 65, 14, 1855);
+        attr_dev(div6, "class", "field is-narrow");
+        add_location(div6, file$3, 64, 12, 1811);
+        attr_dev(div7, "class", "field-body");
+        add_location(div7, file$3, 63, 10, 1774);
+        attr_dev(div8, "class", "field is-horizontal");
+        add_location(div8, file$3, 59, 8, 1632);
+        attr_dev(label4, "class", "label");
+        add_location(label4, file$3, 80, 12, 2371);
+        attr_dev(div9, "class", "field-label is-normal");
+        add_location(div9, file$3, 79, 10, 2323);
+        attr_dev(textarea, "class", "textarea textarea-feedback svelte-lbo539");
+        attr_dev(textarea, "placeholder", "Thoughts or suggestions about this HIT");
+        add_location(textarea, file$3, 85, 16, 2545);
+        attr_dev(div10, "class", "control");
+        add_location(div10, file$3, 84, 14, 2507);
+        attr_dev(div11, "class", "field");
+        add_location(div11, file$3, 83, 12, 2473);
+        attr_dev(div12, "class", "field-body");
+        add_location(div12, file$3, 82, 10, 2436);
+        attr_dev(div13, "class", "field is-horizontal");
+        add_location(div13, file$3, 78, 8, 2279);
+        attr_dev(div14, "class", "field-label");
+        add_location(div14, file$3, 94, 10, 2846);
         attr_dev(button, "class", "button is-success is-large");
-        add_location(button, file$3, 17, 6, 640);
-        attr_dev(div0, "class", "column is-three-quarters");
-        add_location(div0, file$3, 15, 4, 538);
-        attr_dev(div1, "class", "columns is-centered");
-        add_location(div1, file$3, 14, 2, 500);
-        attr_dev(div2, "class", "container");
-        add_location(div2, file$3, 13, 0, 474);
-        dispose = listen_dev(button, "click", ctx.submitHIT, false, false, false);
+        add_location(button, file$3, 100, 16, 3052);
+        attr_dev(div15, "class", "control");
+        add_location(div15, file$3, 99, 14, 3014);
+        attr_dev(div16, "class", "field");
+        add_location(div16, file$3, 98, 12, 2980);
+        attr_dev(div17, "class", "field-body");
+        add_location(div17, file$3, 97, 10, 2943);
+        attr_dev(div18, "class", "field is-horizontal");
+        add_location(div18, file$3, 93, 8, 2802);
+        add_location(form, file$3, 46, 6, 1170);
+        attr_dev(div19, "class", "column is-three-quarters");
+        add_location(div19, file$3, 41, 4, 941);
+        attr_dev(div20, "class", "columns is-centered");
+        add_location(div20, file$3, 40, 2, 903);
+        attr_dev(div21, "class", "container");
+        add_location(div21, file$3, 39, 0, 877);
+        dispose = [listen_dev(input0, "input", ctx.input0_input_handler), listen_dev(input1, "change", ctx.input1_change_handler), listen_dev(input2, "change", ctx.input2_change_handler), listen_dev(textarea, "input", ctx.textarea_input_handler), listen_dev(form, "submit", prevent_default(ctx.submitHIT), false, false, true)];
       },
       l: function claim(nodes) {
         throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
       },
       m: function mount(target, anchor) {
-        insert_dev(target, div2, anchor);
+        insert_dev(target, div21, anchor);
+        append_dev(div21, div20);
+        append_dev(div20, div19);
+        append_dev(div19, p0);
+        append_dev(div19, t1);
+        append_dev(div19, p1);
+        append_dev(p1, em);
+        append_dev(div19, t3);
+        append_dev(div19, form);
+        append_dev(form, div3);
+        append_dev(div3, div0);
+        append_dev(div0, label0);
+        append_dev(div3, t5);
+        append_dev(div3, div2);
         append_dev(div2, div1);
-        append_dev(div1, div0);
-        append_dev(div0, h1);
-        append_dev(div0, t1);
-        append_dev(div0, button);
+        append_dev(div1, p2);
+        append_dev(p2, input0);
+        set_input_value(input0, ctx.age);
+        append_dev(form, t6);
+        append_dev(form, div8);
+        append_dev(div8, div4);
+        append_dev(div4, label1);
+        append_dev(div8, t8);
+        append_dev(div8, div7);
+        append_dev(div7, div6);
+        append_dev(div6, div5);
+        append_dev(div5, label2);
+        append_dev(label2, input1);
+        input1.checked = input1.__value === ctx.sex;
+        append_dev(label2, t9);
+        append_dev(div5, t10);
+        append_dev(div5, label3);
+        append_dev(label3, input2);
+        input2.checked = input2.__value === ctx.sex;
+        append_dev(label3, t11);
+        append_dev(form, t12);
+        append_dev(form, div13);
+        append_dev(div13, div9);
+        append_dev(div9, label4);
+        append_dev(div13, t14);
+        append_dev(div13, div12);
+        append_dev(div12, div11);
+        append_dev(div11, div10);
+        append_dev(div10, textarea);
+        set_input_value(textarea, ctx.feedback);
+        append_dev(form, t15);
+        append_dev(form, div18);
+        append_dev(div18, div14);
+        append_dev(div18, t16);
+        append_dev(div18, div17);
+        append_dev(div17, div16);
+        append_dev(div16, div15);
+        append_dev(div15, button);
       },
-      p: noop,
+      p: function update(changed, ctx) {
+        if (changed.age && input0.value !== ctx.age) {
+          set_input_value(input0, ctx.age);
+        }
+
+        if (changed.sex) {
+          input1.checked = input1.__value === ctx.sex;
+        }
+
+        if (changed.sex) {
+          input2.checked = input2.__value === ctx.sex;
+        }
+
+        if (changed.feedback) {
+          set_input_value(textarea, ctx.feedback);
+        }
+      },
       i: noop,
       o: noop,
       d: function destroy(detaching) {
-        if (detaching) detach_dev(div2);
-        dispose();
+        if (detaching) detach_dev(div21);
+        ctx.$$binding_groups[0].splice(ctx.$$binding_groups[0].indexOf(input1), 1);
+        ctx.$$binding_groups[0].splice(ctx.$$binding_groups[0].indexOf(input2), 1);
+        run_all(dispose);
       }
     };
     dispatch_dev("SvelteRegisterBlock", {
@@ -52554,20 +52797,88 @@ var app = (function () {
     return block;
   }
 
-  function instance$3($$self) {
+  function instance$3($$self, $$props, $$invalidate) {
+    var age = "";
+    var feedback = "";
+    var sex = "";
+
     var submitHIT = function submitHIT() {
-      window.top.postMessage("finished", "*");
-      console.log("back to PsiTurk!");
+      return regeneratorRuntime.async(function submitHIT$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              _context.prev = 0;
+              _context.next = 3;
+              return regeneratorRuntime.awrap(db$1.collection("participants").doc(params.workerId).set({
+                age: age,
+                sex: sex,
+                feedback: feedback
+              }, {
+                merge: true
+              }));
+
+            case 3:
+              console.log("exit survey added successfully");
+              window.top.postMessage("finished", "*");
+              console.log("back to PsiTurk!");
+              _context.next = 11;
+              break;
+
+            case 8:
+              _context.prev = 8;
+              _context.t0 = _context["catch"](0);
+              console.error(_context.t0);
+
+            case 11:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, null, null, [[0, 8]]);
     };
+
+    var $$binding_groups = [[]];
+
+    function input0_input_handler() {
+      age = this.value;
+      $$invalidate("age", age);
+    }
+
+    function input1_change_handler() {
+      sex = this.__value;
+      $$invalidate("sex", sex);
+    }
+
+    function input2_change_handler() {
+      sex = this.__value;
+      $$invalidate("sex", sex);
+    }
+
+    function textarea_input_handler() {
+      feedback = this.value;
+      $$invalidate("feedback", feedback);
+    }
 
     $$self.$capture_state = function () {
       return {};
     };
 
-    $$self.$inject_state = function ($$props) {};
+    $$self.$inject_state = function ($$props) {
+      if ("age" in $$props) $$invalidate("age", age = $$props.age);
+      if ("feedback" in $$props) $$invalidate("feedback", feedback = $$props.feedback);
+      if ("sex" in $$props) $$invalidate("sex", sex = $$props.sex);
+    };
 
     return {
-      submitHIT: submitHIT
+      age: age,
+      feedback: feedback,
+      sex: sex,
+      submitHIT: submitHIT,
+      input0_input_handler: input0_input_handler,
+      input1_change_handler: input1_change_handler,
+      input2_change_handler: input2_change_handler,
+      textarea_input_handler: textarea_input_handler,
+      $$binding_groups: $$binding_groups
     };
   }
 
@@ -52743,7 +53054,7 @@ var app = (function () {
         section = element("section");
         if (if_block) if_block.c();
         attr_dev(section, "class", "section");
-        add_location(section, file$4, 65, 0, 2566);
+        add_location(section, file$4, 65, 0, 2846);
       },
       l: function claim(nodes) {
         throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
