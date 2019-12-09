@@ -1,6 +1,6 @@
 <script>
   // This is the debrief page in which we should collect any post survey questions. There's a single button that should save reponses to firebase and then tell PsiTurk we're done.
-  import { db, params } from '../utils.js';
+  import { db, params, serverTime } from '../utils.js';
 
   let age = '';
   let feedback = '';
@@ -10,7 +10,8 @@
       await db.ref(`participants/${params.workerId}`).update({
         age,
         sex,
-        feedback
+        feedback,
+        HIT_complete: serverTime
       });
       console.log('exit survey added successfully');
       window.top.postMessage('finished', '*');

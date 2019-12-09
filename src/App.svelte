@@ -1,7 +1,7 @@
 <script>
   // This is the main Svelte component that will display after a user provides conset within PsiTurk. It serves two main purposes: 1) it initializes a new entry into the firebase database if a workerId from the URL is not found or retrieves an existing record if a workerId is found. Creating a new entry sets up the random trial order the participant will receive for all the recordings. 2) it uses that information to dynamically render different experiment states based upon what a user does i.e. show instructions, show quiz, show experiment, show exit survey. Each of those different states exist as their own .svelte files within the pages/ folder
   import { onMount } from 'svelte';
-  import { db, auth, params, fisherYatesShuffle } from './utils.js';
+  import { db, auth, params, fisherYatesShuffle, serverTime } from './utils.js';
   import Instructions from './pages/Instructions.svelte';
   // import Quiz from './pages/Quiz.svelte';
   import Experiment from './pages/Experiment.svelte';
@@ -24,7 +24,11 @@
     // Change to the new state within Svelte
     currentState = newState;
     try {
-      await db.ref(`participants/${params.workerId}`).update({ currentState });
+      const doc = {
+        currentState
+      };
+      doc[`${currentState}_start`] = serverTime;
+      await db.ref(`participants/${params.workerId}`).update(doc);
       console.log('updated user state');
     } catch (error) {
       console.error(error);
@@ -71,13 +75,12 @@
               query.forEach((doc) => {
                 trialOrder.push(doc.val().name);
               });
-              console.log(trialOrder);
               fisherYatesShuffle(trialOrder);
               await db.ref(`participants/${params.workerId}`).set({
                 workerId: params.workerId,
                 assignmentId: params.assignmentId,
                 hitId: params.hitId,
-                startTime: new Date(),
+                startTime: serverTime,
                 currentState: 'instructions',
                 currentTrial: 1,
                 trialOrder

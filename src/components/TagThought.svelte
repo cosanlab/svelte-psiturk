@@ -2,7 +2,7 @@
   // This is the main ThoughTagging component that gets rendered within Experiment.svelte. It takes as an "argument" a "src" value from Experiment.svelte that tells it which audo file to render
   import Peaks from 'peaks.js';
   import { onMount, createEventDispatcher } from 'svelte';
-  import { db, params } from '../utils.js';
+  import { db, params, serverTime } from '../utils.js';
 
   // This is how the Experiment page can tell TagThought which src to display in Peaksjs. It's like a function argument to TagThought
   export let src;
@@ -95,7 +95,8 @@
         clarity,
         confidence,
         recordingLength: time,
-        thoughts: toSave
+        thoughts: toSave,
+        submitTime: serverTime
       },
       currentTrial: currentTrial + 1
     };

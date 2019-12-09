@@ -20,6 +20,7 @@ firebase.initializeApp(firebaseConfig);
 export const db = firebase.database();
 export const storage = firebase.storage();
 export const auth = firebase.auth();
+export const serverTime = firebase.database.ServerValue.TIMESTAMP;
 
 // Functions to parse the URL to get workerID, hitID, and assignmentID
 const unescapeURL = (s) => decodeURIComponent(s.replace(/\+/g, '%20'));
