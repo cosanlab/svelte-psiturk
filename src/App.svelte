@@ -24,10 +24,7 @@
     // Change to the new state within Svelte
     currentState = newState;
     try {
-      await db
-        .collection('participants')
-        .doc(params.workerId)
-        .set({ currentState }, { merge: true });
+      await db.ref(`participants/${params.workerId}`).update({ currentState });
       console.log('updated user state');
     } catch (error) {
       console.error(error);
@@ -59,37 +56,32 @@
         } else {
           console.log('user already authenticated...');
           try {
-            const resp = await db
-              .collection('participants')
-              .doc(params.workerId)
-              .get();
-            if (resp.exists) {
-              const data = resp.data();
+            const resp = await db.ref(`participants/${params.workerId}`).once('value');
+            if (resp.val() !== null) {
+              const data = resp.val();
               currentState = data.currentState;
               trialOrder = data.trialOrder;
               console.log('previous document found...loading state...');
             } else {
               const query = await db
-                .collection('recordings')
-                .orderBy('responses')
-                .limit(10)
-                .get();
+                .ref('recordings')
+                .orderByChild('responses')
+                .limitToFirst(10)
+                .once('value');
               query.forEach((doc) => {
-                trialOrder.push(doc.data().name);
+                trialOrder.push(doc.val().name);
               });
+              console.log(trialOrder);
               fisherYatesShuffle(trialOrder);
-              await db
-                .collection('participants')
-                .doc(params.workerId)
-                .set({
-                  workerId: params.workerId,
-                  assignmentId: params.assignmentId,
-                  hitId: params.hitId,
-                  startTime: new Date(),
-                  currentState: 'instructions',
-                  currentTrial: 1,
-                  trialOrder
-                });
+              await db.ref(`participants/${params.workerId}`).set({
+                workerId: params.workerId,
+                assignmentId: params.assignmentId,
+                hitId: params.hitId,
+                startTime: new Date(),
+                currentState: 'instructions',
+                currentTrial: 1,
+                trialOrder
+              });
               currentState = 'instructions';
               console.log('no previous document found...creating new...');
             }

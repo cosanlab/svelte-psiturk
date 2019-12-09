@@ -29,11 +29,8 @@
   // Before rendering anything see what trial we should be rendering. Because this is an async function we call immediately to dynamically show a loading screen before we get the data in the HTML below
   let filePromise = (async () => {
     try {
-      const resp = await db
-        .collection('participants')
-        .doc(params.workerId)
-        .get();
-      currentTrial = resp.data().currentTrial;
+      const resp = await db.ref(`participants/${params.workerId}`).once('value');
+      currentTrial = resp.val().currentTrial;
       return await generateFileURL();
     } catch (error) {
       return console.error(error);

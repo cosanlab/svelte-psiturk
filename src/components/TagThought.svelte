@@ -80,8 +80,9 @@
   const finish = async () => {
     // We have to strip-out the extra properties that segment objects have (e.g. like waveform color) because firebase doesn't like that. Plus we only care about start and end times
     const toSave = {};
+    console.log(segments);
     segments.forEach((obj) => {
-      toSave[obj._id] = {
+      toSave[obj._id.replace(/\./g, '_')] = {
         startTime: obj._startTime,
         endTime: obj._endTime
       };
@@ -99,10 +100,7 @@
       currentTrial: currentTrial + 1
     };
     try {
-      await db
-        .collection('participants')
-        .doc(params.workerId)
-        .set(doc, { merge: true });
+      await db.ref(`participants/${params.workerId}`).update(doc);
       console.log('document added successfully');
       peaksInstance.destroy();
       dispatch('next');

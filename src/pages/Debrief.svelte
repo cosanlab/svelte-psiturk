@@ -7,17 +7,11 @@
   let sex = '';
   const submitHIT = async () => {
     try {
-      await db
-        .collection('participants')
-        .doc(params.workerId)
-        .set(
-          {
-            age,
-            sex,
-            feedback
-          },
-          { merge: true }
-        );
+      await db.ref(`participants/${params.workerId}`).update({
+        age,
+        sex,
+        feedback
+      });
       console.log('exit survey added successfully');
       window.top.postMessage('finished', '*');
       console.log('back to PsiTurk!');
