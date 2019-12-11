@@ -1,9 +1,9 @@
 <script>
   // This is the main Svelte component that will display after a user provides conset within PsiTurk. It serves two main purposes: 1) it initializes a new entry into the firebase database if a workerId from the URL is not found or retrieves an existing record if a workerId is found. Creating a new entry sets up the random trial order the participant will receive for all the recordings. 2) it uses that information to dynamically render different experiment states based upon what a user does i.e. show instructions, show quiz, show experiment, show exit survey. Each of those different states exist as their own .svelte files within the pages/ folder
   import { onMount } from 'svelte';
-  import { db, auth, params, fisherYatesShuffle, serverTime } from './utils.js';
+  import { db, auth, storage, params, fisherYatesShuffle, serverTime } from './utils.js';
   import Instructions from './pages/Instructions.svelte';
-  // import Quiz from './pages/Quiz.svelte';
+  import Quiz from './pages/Quiz.svelte';
   import Experiment from './pages/Experiment.svelte';
   import Debrief from './pages/Debrief.svelte';
   import Loading from './components/Loading.svelte';
@@ -34,6 +34,20 @@
       console.error(error);
     }
   };
+
+  // eslint-disable-next-line consistent-return
+  const generateFileUrl = async () => {
+    try {
+      const file = storage.refFromURL('gs://thought-segmentation.appspot.com/quiz.mp3');
+      const url = await file.getDownloadURL();
+      return url;
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // eslint-disable-next-line prefer-const
+  let quizAudio = generateFileUrl();
 
   // Before we render anything see if we have a db entry for this subject based upon the URL parameters. If not create an entry with a new random stimulus order and put them into the instructions state. If we do, load their trial order and current experiment state
   onMount(async () => {
@@ -105,7 +119,16 @@
   {:else if currentState === 'instructions'}
     <!-- Listen for when the instructions page dispatches "finished" and call updateState when it does-->
     <!-- TODO: Instructions should go to quiz rather than experiment, afer we finish making the quiz page -->
-    <Instructions on:finished={() => updateState('experiment')} />
+    <Instructions on:finished={() => updateState('quiz')} />
+  {:else if currentState === 'quiz'}
+    {#await quizAudio}
+      <Loading>Loading...</Loading>
+    {:then src}
+      <Quiz
+        {src}
+        on:finishedComplete={() => updateState('debrief')}
+        on:finishedContinue={() => updateState('experiment')} />
+    {/await}
   {:else if currentState === 'experiment'}
     <Experiment {trialOrder} on:finished={() => updateState('debrief')} />
   {:else if currentState === 'debrief'}

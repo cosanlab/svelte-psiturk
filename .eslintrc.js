@@ -28,7 +28,8 @@ module.exports = {
     'no-underscore-dangle': 0,
     'import/no-extraneous-dependencies': 0,
     'object-curly-newline': 0,
-    'no-return-assign': 0
+    'no-return-assign': 0,
+    'no-param-reassign': 0
   },
   overrides: [
     {
