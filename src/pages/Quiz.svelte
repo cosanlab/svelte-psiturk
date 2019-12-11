@@ -268,10 +268,6 @@
     box-shadow: 3px 3px 3px rgba(10, 10, 10, 0.1), 0 0 0 1px rgba(10, 10, 10, 0.1);
     pointer-events: auto;
   }
-  .highlight > * {
-    filter: blur(0);
-    -webkit-filter: blur(0);
-  }
   .modal {
     pointer-events: none;
   }
@@ -288,10 +284,10 @@
     left: 12%;
   }
   .button-row {
-    padding-bottom: 0;
+    margin-bottom: 0 !important;
   }
-  .unset-width {
-    width: unset !important;
+  .button-col {
+    padding-bottom: 0 !important;
   }
 </style>
 
@@ -371,7 +367,7 @@
   class:blur={tutorialState === 'Overview' || tutorialSubmitted || quizFailed}>
   <!-- Title + Waveform display row -->
   <div class="columns is-centered">
-    <div class="column is-three-quarters has-text-centered">
+    <div class="column is-full has-text-centered">
       <h1 class="title">Example Audio</h1>
       {#if peaksLoading}
         <h3 class="title is-3">Loading audio...</h3>
@@ -382,18 +378,18 @@
   </div>
   <!-- Controls + Button row -->
   <div class="columns is-centered">
-    <div class="column is-three-quarters">
+    <div class="column is-full">
       <!-- Nested row with playback controls on left and buttons on right -->
       <div class="columns">
-        <div class="column is-one-quarter">
-          <div class="columns is-gapless">
-            <div class="column is-10">
+        <div class="column is-narrow">
+          <div class="columns is-gapless is-mobile">
+            <div class="column is-narrow">
               <audio id="audio" controls="controls" controlslist="nodownload">
                 <source {src} type="audio/wav" />
                 Your browser does not support the audio element.
               </audio>
             </div>
-            <div class="column is-2">
+            <div class="column">
               <span
                 class="icon is-large"
                 class:is-invisible={!tutorialComplete}
@@ -402,18 +398,17 @@
               </span>
             </div>
           </div>
-
         </div>
-        <div class="column is-three-quarters">
+        <div class="column">
           {#if rate}
             <button class="button is-primary is-large" on:click={finish} disabled={nextTrialActive}>
               Next
             </button>
           {:else}
-            <div class="columns">
-              <div class="column is-4 unset-width">
-                <div class="columns">
-                  <div class="column button-row">
+            <div class="columns is-gapless">
+              <div class="column is-narrow">
+                <div class="columns button-row">
+                  <div class="column button-col">
                     <button
                       class="button is-primary is-large"
                       class:blur={currentStep < 2}
@@ -459,8 +454,8 @@
   </div>
   {#if rate}
     <!-- Rating row (only if table not displayed) -->
-    <div class={rate ? 'columns is-centered' : 'columns is-centered'}>
-      <div class="column is-3 has-text-centered">
+    <div class="columns is-centered">
+      <div class="column is-narrow has-text-centered">
         <div class="field">
           <label class="label has-text-weight-normal is-size-5">
             When did the speaker stop talking?
@@ -478,7 +473,7 @@
           {/if}
         </div>
       </div>
-      <div class="column is-3 has-text-centered">
+      <div class="column is-4-desktop is-3-fullhd has-text-centered">
         <p class="has-text-centered is-size-5">How clear was the quality of the recording?</p>
         <input
           step="1"
@@ -487,7 +482,7 @@
           type="range"
           bind:value={clarity}
           on:click|once={() => (clarityRated = true)} />
-        <div class="columns is-centered">
+        <div class="columns is-mobile is-centered">
           <div class="column has-text-left">
             <p class="subtitle is-size-6">Uninterpretable</p>
           </div>
@@ -496,7 +491,7 @@
           </div>
         </div>
       </div>
-      <div class="column is-3 has-text-centered">
+      <div class="column is-4-desktop is-3-fullhd has-text-centered">
         <p class="has-text-centered is-size-5">How easy was it to tag different thoughts?</p>
         <input
           step="1"
@@ -505,7 +500,7 @@
           type="range"
           bind:value={confidence}
           on:click|once={() => (confidenceRated = true)} />
-        <div class="columns is-centered">
+        <div class="columns is-mobile is-centered">
           <div class="column has-text-left">
             <p class="subtitle is-size-6">Impossible</p>
           </div>
@@ -514,12 +509,11 @@
           </div>
         </div>
       </div>
-
     </div>
   {:else}
     <!-- Table row only if rating now displayed -->
     <div class="columns is-centered" class:blur={currentStep < 2}>
-      <div class="column is-three-quarters has-text-centered">
+      <div class="column is-full has-text-centered">
         {#if segments && segments.length}
           <div class="table-container">
             <table class="table is-hoverable">
