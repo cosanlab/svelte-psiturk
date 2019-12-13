@@ -1540,34 +1540,6 @@ var app = (function () {
     }
   });
 
-  var quot = /"/g;
-
-  // B.2.3.2.1 CreateHTML(string, tag, attribute, value)
-  // https://tc39.github.io/ecma262/#sec-createhtml
-  var createHtml = function (string, tag, attribute, value) {
-    var S = String(requireObjectCoercible(string));
-    var p1 = '<' + tag;
-    if (attribute !== '') p1 += ' ' + attribute + '="' + String(value).replace(quot, '&quot;') + '"';
-    return p1 + '>' + S + '</' + tag + '>';
-  };
-
-  // check the existence of a method, lowercase
-  // of a tag and escaping quotes in arguments
-  var forcedStringHtmlMethod = function (METHOD_NAME) {
-    return fails(function () {
-      var test = ''[METHOD_NAME]('"');
-      return test !== test.toLowerCase() || test.split('"').length > 3;
-    });
-  };
-
-  // `String.prototype.anchor` method
-  // https://tc39.github.io/ecma262/#sec-string.prototype.anchor
-  _export({ target: 'String', proto: true, forced: forcedStringHtmlMethod('anchor') }, {
-    anchor: function anchor(name) {
-      return createHtml(this, 'a', 'name', name);
-    }
-  });
-
   // iterable DOM collections
   // flag - `iterable` interface - 'entries', 'keys', 'values', 'forEach' methods
   var domIterables = {
@@ -4101,6 +4073,34 @@ var app = (function () {
     ];
   }, !SUPPORTS_Y);
 
+  var quot = /"/g;
+
+  // B.2.3.2.1 CreateHTML(string, tag, attribute, value)
+  // https://tc39.github.io/ecma262/#sec-createhtml
+  var createHtml = function (string, tag, attribute, value) {
+    var S = String(requireObjectCoercible(string));
+    var p1 = '<' + tag;
+    if (attribute !== '') p1 += ' ' + attribute + '="' + String(value).replace(quot, '&quot;') + '"';
+    return p1 + '>' + S + '</' + tag + '>';
+  };
+
+  // check the existence of a method, lowercase
+  // of a tag and escaping quotes in arguments
+  var forcedStringHtmlMethod = function (METHOD_NAME) {
+    return fails(function () {
+      var test = ''[METHOD_NAME]('"');
+      return test !== test.toLowerCase() || test.split('"').length > 3;
+    });
+  };
+
+  // `String.prototype.anchor` method
+  // https://tc39.github.io/ecma262/#sec-string.prototype.anchor
+  _export({ target: 'String', proto: true, forced: forcedStringHtmlMethod('anchor') }, {
+    anchor: function anchor(name) {
+      return createHtml(this, 'a', 'name', name);
+    }
+  });
+
   var ITERATOR$5 = wellKnownSymbol('iterator');
   var TO_STRING_TAG$3 = wellKnownSymbol('toStringTag');
   var ArrayValues = es_array_iterator.values;
@@ -4294,6 +4294,19 @@ var app = (function () {
         });
       }
     };
+  }
+  // shorthand events, or if we want to implement
+  // a real bubbling mechanism
+
+
+  function bubble(component, event) {
+    var callbacks = component.$$.callbacks[event.type];
+
+    if (callbacks) {
+      callbacks.slice().forEach(function (fn) {
+        return fn(event);
+      });
+    }
   }
 
   var dirty_components = [];
@@ -27349,6 +27362,17 @@ var app = (function () {
   // https://tc39.github.io/ecma262/#sec-symbol.iterator
   defineWellKnownSymbol('iterator');
 
+  var $every = arrayIteration.every;
+
+
+  // `Array.prototype.every` method
+  // https://tc39.github.io/ecma262/#sec-array.prototype.every
+  _export({ target: 'Array', proto: true, forced: sloppyArrayMethod('every') }, {
+    every: function every(callbackfn /* , thisArg */) {
+      return $every(this, callbackfn, arguments.length > 1 ? arguments[1] : undefined);
+    }
+  });
+
   var $includes = arrayIncludes.includes;
 
 
@@ -27362,6 +27386,53 @@ var app = (function () {
 
   // https://tc39.github.io/ecma262/#sec-array.prototype-@@unscopables
   addToUnscopables('includes');
+
+  // `Array.prototype.{ reduce, reduceRight }` methods implementation
+  var createMethod$3 = function (IS_RIGHT) {
+    return function (that, callbackfn, argumentsLength, memo) {
+      aFunction$1(callbackfn);
+      var O = toObject(that);
+      var self = indexedObject(O);
+      var length = toLength(O.length);
+      var index = IS_RIGHT ? length - 1 : 0;
+      var i = IS_RIGHT ? -1 : 1;
+      if (argumentsLength < 2) while (true) {
+        if (index in self) {
+          memo = self[index];
+          index += i;
+          break;
+        }
+        index += i;
+        if (IS_RIGHT ? index < 0 : length <= index) {
+          throw TypeError('Reduce of empty array with no initial value');
+        }
+      }
+      for (;IS_RIGHT ? index >= 0 : length > index; index += i) if (index in self) {
+        memo = callbackfn(memo, self[index], index, O);
+      }
+      return memo;
+    };
+  };
+
+  var arrayReduce = {
+    // `Array.prototype.reduce` method
+    // https://tc39.github.io/ecma262/#sec-array.prototype.reduce
+    left: createMethod$3(false),
+    // `Array.prototype.reduceRight` method
+    // https://tc39.github.io/ecma262/#sec-array.prototype.reduceright
+    right: createMethod$3(true)
+  };
+
+  var $reduce = arrayReduce.left;
+
+
+  // `Array.prototype.reduce` method
+  // https://tc39.github.io/ecma262/#sec-array.prototype.reduce
+  _export({ target: 'Array', proto: true, forced: sloppyArrayMethod('reduce') }, {
+    reduce: function reduce(callbackfn /* , initialValue */) {
+      return $reduce(this, callbackfn, arguments.length, arguments.length > 1 ? arguments[1] : undefined);
+    }
+  });
 
   // `thisNumberValue` abstract operation
   // https://tc39.github.io/ecma262/#sec-thisnumbervalue
@@ -27512,7 +27583,7 @@ var app = (function () {
   var rtrim = RegExp(whitespace + whitespace + '*$');
 
   // `String.prototype.{ trim, trimStart, trimEnd, trimLeft, trimRight }` methods implementation
-  var createMethod$3 = function (TYPE) {
+  var createMethod$4 = function (TYPE) {
     return function ($this) {
       var string = String(requireObjectCoercible($this));
       if (TYPE & 1) string = string.replace(ltrim, '');
@@ -27524,13 +27595,13 @@ var app = (function () {
   var stringTrim = {
     // `String.prototype.{ trimLeft, trimStart }` methods
     // https://tc39.github.io/ecma262/#sec-string.prototype.trimstart
-    start: createMethod$3(1),
+    start: createMethod$4(1),
     // `String.prototype.{ trimRight, trimEnd }` methods
     // https://tc39.github.io/ecma262/#sec-string.prototype.trimend
-    end: createMethod$3(2),
+    end: createMethod$4(2),
     // `String.prototype.trim` method
     // https://tc39.github.io/ecma262/#sec-string.prototype.trim
-    trim: createMethod$3(3)
+    trim: createMethod$4(3)
   };
 
   var trim = stringTrim.trim;
@@ -43476,321 +43547,80 @@ var app = (function () {
   var Peaks = unwrapExports(peaks);
 
   var console_1 = globals.console;
-  var file$1 = "src/pages/Quiz.svelte";
+  var file$1 = "src/components/ThoughtTagger.svelte";
 
   function get_each_context(ctx, list, i) {
     var child_ctx = Object.create(ctx);
     child_ctx.segment = list[i];
     child_ctx.i = i;
     return child_ctx;
-  } // (335:6) {:else}
+  } // (270:6) {:else}
 
 
   function create_else_block_3(ctx) {
-    var p0;
-    var button;
-    var span;
-    var i;
-    var t;
-    var p1;
-    var dispose;
-
-    function select_block_type_1(changed, ctx) {
-      if (ctx.currentStep === ctx.tutorialInstructions.length - 1) return create_if_block_8;
-      if (ctx.currentStep !== 2 || ctx.segments.length > 0) return create_if_block_9;
-    }
-
-    var current_block_type = select_block_type_1(null, ctx);
-    var if_block = current_block_type && current_block_type(ctx);
+    var h1;
+    var t0;
+    var t1;
     var block = {
       c: function create() {
-        p0 = element("p");
-        button = element("button");
-        span = element("span");
-        i = element("i");
-        t = space();
-        p1 = element("p");
-        if (if_block) if_block.c();
-        attr_dev(i, "class", "fas fa-backward");
-        add_location(i, file$1, 338, 14, 13969);
-        attr_dev(span, "class", "icon");
-        add_location(span, file$1, 337, 12, 13935);
-        attr_dev(button, "class", "button is-link controls");
-        add_location(button, file$1, 336, 10, 13862);
-        attr_dev(p0, "class", "card-footer-item");
-        add_location(p0, file$1, 335, 8, 13823);
-        attr_dev(p1, "class", "card-footer-item");
-        add_location(p1, file$1, 342, 8, 14060);
-        dispose = listen_dev(button, "click", ctx.backward, false, false, false);
+        h1 = element("h1");
+        t0 = text("Recording #");
+        t1 = text(ctx.currentTrial);
+        attr_dev(h1, "class", "title");
+        add_location(h1, file$1, 270, 8, 8819);
       },
       m: function mount(target, anchor) {
-        insert_dev(target, p0, anchor);
-        append_dev(p0, button);
-        append_dev(button, span);
-        append_dev(span, i);
-        insert_dev(target, t, anchor);
-        insert_dev(target, p1, anchor);
-        if (if_block) if_block.m(p1, null);
+        insert_dev(target, h1, anchor);
+        append_dev(h1, t0);
+        append_dev(h1, t1);
       },
       p: function update(changed, ctx) {
-        if (current_block_type === (current_block_type = select_block_type_1(changed, ctx)) && if_block) {
-          if_block.p(changed, ctx);
-        } else {
-          if (if_block) if_block.d(1);
-          if_block = current_block_type && current_block_type(ctx);
-
-          if (if_block) {
-            if_block.c();
-            if_block.m(p1, null);
-          }
-        }
+        if (changed.currentTrial) set_data_dev(t1, ctx.currentTrial);
       },
       d: function destroy(detaching) {
-        if (detaching) detach_dev(p0);
-        if (detaching) detach_dev(t);
-        if (detaching) detach_dev(p1);
-
-        if (if_block) {
-          if_block.d();
-        }
-
-        dispose();
+        if (detaching) detach_dev(h1);
       }
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
       id: create_else_block_3.name,
       type: "else",
-      source: "(335:6) {:else}",
+      source: "(270:6) {:else}",
       ctx: ctx
     });
     return block;
-  } // (309:6) {#if quizComplete}
-
-
-  function create_if_block_5(ctx) {
-    var t;
-    var if_block1_anchor;
-    var if_block0 = ctx.tutorialSubmitted && create_if_block_7(ctx);
-    var if_block1 = ctx.quizFailed && create_if_block_6(ctx);
-    var block = {
-      c: function create() {
-        if (if_block0) if_block0.c();
-        t = space();
-        if (if_block1) if_block1.c();
-        if_block1_anchor = empty();
-      },
-      m: function mount(target, anchor) {
-        if (if_block0) if_block0.m(target, anchor);
-        insert_dev(target, t, anchor);
-        if (if_block1) if_block1.m(target, anchor);
-        insert_dev(target, if_block1_anchor, anchor);
-      },
-      p: function update(changed, ctx) {
-        if (ctx.tutorialSubmitted) {
-          if (if_block0) {
-            if_block0.p(changed, ctx);
-          } else {
-            if_block0 = create_if_block_7(ctx);
-            if_block0.c();
-            if_block0.m(t.parentNode, t);
-          }
-        } else if (if_block0) {
-          if_block0.d(1);
-          if_block0 = null;
-        }
-
-        if (ctx.quizFailed) {
-          if (if_block1) {
-            if_block1.p(changed, ctx);
-          } else {
-            if_block1 = create_if_block_6(ctx);
-            if_block1.c();
-            if_block1.m(if_block1_anchor.parentNode, if_block1_anchor);
-          }
-        } else if (if_block1) {
-          if_block1.d(1);
-          if_block1 = null;
-        }
-      },
-      d: function destroy(detaching) {
-        if (if_block0) if_block0.d(detaching);
-        if (detaching) detach_dev(t);
-        if (if_block1) if_block1.d(detaching);
-        if (detaching) detach_dev(if_block1_anchor);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_if_block_5.name,
-      type: "if",
-      source: "(309:6) {#if quizComplete}",
-      ctx: ctx
-    });
-    return block;
-  } // (352:61) 
-
-
-  function create_if_block_9(ctx) {
-    var button;
-    var span;
-    var i;
-    var dispose;
-    var block = {
-      c: function create() {
-        button = element("button");
-        span = element("span");
-        i = element("i");
-        attr_dev(i, "class", "fas fa-forward");
-        add_location(i, file$1, 354, 16, 14539);
-        attr_dev(span, "class", "icon");
-        add_location(span, file$1, 353, 14, 14503);
-        attr_dev(button, "class", "button is-link controls");
-        add_location(button, file$1, 352, 12, 14429);
-        dispose = listen_dev(button, "click", ctx.forward, false, false, false);
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, button, anchor);
-        append_dev(button, span);
-        append_dev(span, i);
-      },
-      p: noop,
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(button);
-        dispose();
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_if_block_9.name,
-      type: "if",
-      source: "(352:61) ",
-      ctx: ctx
-    });
-    return block;
-  } // (344:10) {#if currentStep === tutorialInstructions.length - 1}
-
-
-  function create_if_block_8(ctx) {
-    var button;
-    var dispose;
-    var block = {
-      c: function create() {
-        button = element("button");
-        button.textContent = "Hide Help";
-        attr_dev(button, "class", "button is-link controls");
-        add_location(button, file$1, 344, 12, 14165);
-        dispose = listen_dev(button, "click", ctx.click_handler_3, false, false, false);
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, button, anchor);
-      },
-      p: noop,
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(button);
-        dispose();
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_if_block_8.name,
-      type: "if",
-      source: "(344:10) {#if currentStep === tutorialInstructions.length - 1}",
-      ctx: ctx
-    });
-    return block;
-  } // (310:8) {#if tutorialSubmitted}
-
-
-  function create_if_block_7(ctx) {
-    var p0;
-    var button0;
-    var t1;
-    var p1;
-    var button1;
-    var dispose;
-    var block = {
-      c: function create() {
-        p0 = element("p");
-        button0 = element("button");
-        button0.textContent = "Skip bonus work";
-        t1 = space();
-        p1 = element("p");
-        button1 = element("button");
-        button1.textContent = "Do bonus work";
-        attr_dev(button0, "class", "button is-warning controls");
-        add_location(button0, file$1, 311, 12, 13089);
-        attr_dev(p0, "class", "card-footer-item");
-        add_location(p0, file$1, 310, 10, 13048);
-        attr_dev(button1, "class", "button is-success controls");
-        add_location(button1, file$1, 318, 12, 13325);
-        attr_dev(p1, "class", "card-footer-item");
-        add_location(p1, file$1, 317, 10, 13284);
-        dispose = [listen_dev(button0, "click", ctx.click_handler, false, false, false), listen_dev(button1, "click", ctx.click_handler_1, false, false, false)];
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, p0, anchor);
-        append_dev(p0, button0);
-        insert_dev(target, t1, anchor);
-        insert_dev(target, p1, anchor);
-        append_dev(p1, button1);
-      },
-      p: noop,
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(p0);
-        if (detaching) detach_dev(t1);
-        if (detaching) detach_dev(p1);
-        run_all(dispose);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_if_block_7.name,
-      type: "if",
-      source: "(310:8) {#if tutorialSubmitted}",
-      ctx: ctx
-    });
-    return block;
-  } // (326:8) {#if quizFailed}
+  } // (268:6) {#if hasTutorial}
 
 
   function create_if_block_6(ctx) {
-    var p;
-    var button;
-    var dispose;
+    var h1;
     var block = {
       c: function create() {
-        p = element("p");
-        button = element("button");
-        button.textContent = "Submit HIT";
-        attr_dev(button, "class", "button is-success is-large controls");
-        add_location(button, file$1, 327, 12, 13598);
-        attr_dev(p, "class", "card-footer-item");
-        add_location(p, file$1, 326, 10, 13557);
-        dispose = listen_dev(button, "click", ctx.click_handler_2, false, false, false);
+        h1 = element("h1");
+        h1.textContent = "Example Recording";
+        attr_dev(h1, "class", "title");
+        add_location(h1, file$1, 268, 8, 8756);
       },
       m: function mount(target, anchor) {
-        insert_dev(target, p, anchor);
-        append_dev(p, button);
+        insert_dev(target, h1, anchor);
       },
       p: noop,
       d: function destroy(detaching) {
-        if (detaching) detach_dev(p);
-        dispose();
+        if (detaching) detach_dev(h1);
       }
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
       id: create_if_block_6.name,
       type: "if",
-      source: "(326:8) {#if quizFailed}",
+      source: "(268:6) {#if hasTutorial}",
       ctx: ctx
     });
     return block;
-  } // (372:6) {#if peaksLoading}
+  } // (273:6) {#if peaksLoading}
 
 
-  function create_if_block_4(ctx) {
+  function create_if_block_5(ctx) {
     var h3;
     var t1;
     var button;
@@ -43801,10 +43631,10 @@ var app = (function () {
         t1 = space();
         button = element("button");
         attr_dev(h3, "class", "title is-3");
-        add_location(h3, file$1, 372, 8, 15001);
-        attr_dev(button, "class", "button is-white is-loading loading-button svelte-iib1zu");
+        add_location(h3, file$1, 273, 8, 8913);
+        attr_dev(button, "class", "button is-white is-loading loading-button svelte-fkpnm1");
         button.disabled = true;
-        add_location(button, file$1, 373, 8, 15054);
+        add_location(button, file$1, 274, 8, 8966);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h3, anchor);
@@ -43819,13 +43649,48 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_if_block_4.name,
+      id: create_if_block_5.name,
       type: "if",
-      source: "(372:6) {#if peaksLoading}",
+      source: "(273:6) {#if peaksLoading}",
       ctx: ctx
     });
     return block;
-  } // (407:10) {:else}
+  } // (294:14) {#if hasTutorial}
+
+
+  function create_if_block_4(ctx) {
+    var span;
+    var i;
+    var dispose;
+    var block = {
+      c: function create() {
+        span = element("span");
+        i = element("i");
+        attr_dev(i, "class", "fas fa-question-circle fa-2x fa-fw");
+        add_location(i, file$1, 295, 18, 9963);
+        attr_dev(span, "class", "icon is-large");
+        add_location(span, file$1, 294, 16, 9872);
+        dispose = listen_dev(span, "click", ctx.click_handler, false, false, false);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, span, anchor);
+        append_dev(span, i);
+      },
+      p: noop,
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(span);
+        dispose();
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block_4.name,
+      type: "if",
+      source: "(294:14) {#if hasTutorial}",
+      ctx: ctx
+    });
+    return block;
+  } // (307:10) {:else}
 
 
   function create_else_block_2(ctx) {
@@ -43870,36 +43735,36 @@ var app = (function () {
         t7 = space();
         button3 = element("button");
         button3.textContent = "Delete";
-        attr_dev(button0, "class", "button is-primary is-large svelte-iib1zu");
-        toggle_class(button0, "blur", ctx.currentStep < 2);
-        add_location(button0, file$1, 411, 20, 16564);
-        attr_dev(button1, "class", "button is-info is-large svelte-iib1zu");
+        attr_dev(button0, "class", "button is-primary is-large svelte-fkpnm1");
+        toggle_class(button0, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
+        add_location(button0, file$1, 311, 20, 10526);
+        attr_dev(button1, "class", "button is-info is-large svelte-fkpnm1");
         button1.disabled = ctx.ratingActive;
-        toggle_class(button1, "blur", ctx.currentStep < 2);
-        add_location(button1, file$1, 417, 20, 16801);
-        attr_dev(div0, "class", "column button-col svelte-iib1zu");
-        add_location(div0, file$1, 410, 18, 16512);
-        attr_dev(div1, "class", "columns button-row svelte-iib1zu");
-        add_location(div1, file$1, 409, 16, 16461);
+        toggle_class(button1, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
+        add_location(button1, file$1, 317, 20, 10779);
+        attr_dev(div0, "class", "column button-col svelte-fkpnm1");
+        add_location(div0, file$1, 310, 18, 10474);
+        attr_dev(div1, "class", "columns button-row svelte-fkpnm1");
+        add_location(div1, file$1, 309, 16, 10423);
         attr_dev(p, "class", "is-size-7");
         toggle_class(p, "is-invisible", ctx.segments.length === 0);
-        add_location(p, file$1, 428, 20, 17207);
+        add_location(p, file$1, 328, 20, 11201);
         attr_dev(div2, "class", "column");
-        add_location(div2, file$1, 427, 18, 17166);
+        add_location(div2, file$1, 327, 18, 11160);
         attr_dev(div3, "class", "columns");
-        add_location(div3, file$1, 426, 16, 17126);
+        add_location(div3, file$1, 326, 16, 11120);
         attr_dev(div4, "class", "column is-narrow");
-        add_location(div4, file$1, 408, 14, 16414);
+        add_location(div4, file$1, 308, 14, 10376);
         attr_dev(button2, "class", "button is-success is-large");
         toggle_class(button2, "is-invisible", !ctx.rowSelected);
-        add_location(button2, file$1, 435, 16, 17476);
+        add_location(button2, file$1, 335, 16, 11470);
         attr_dev(button3, "class", "button is-danger is-large");
         toggle_class(button3, "is-invisible", !ctx.rowSelected);
-        add_location(button3, file$1, 441, 16, 17696);
+        add_location(button3, file$1, 341, 16, 11690);
         attr_dev(div5, "class", "column");
-        add_location(div5, file$1, 434, 14, 17439);
+        add_location(div5, file$1, 334, 14, 11433);
         attr_dev(div6, "class", "columns is-gapless");
-        add_location(div6, file$1, 407, 12, 16367);
+        add_location(div6, file$1, 307, 12, 10329);
         dispose = [listen_dev(button0, "click", ctx.addSegment, false, false, false), listen_dev(button1, "click", ctx.submitTags, false, false, false), listen_dev(button2, "click", ctx.playSegment, false, false, false), listen_dev(button3, "click", ctx.deleteSegment, false, false, false)];
       },
       m: function mount(target, anchor) {
@@ -43922,16 +43787,16 @@ var app = (function () {
         append_dev(div5, button3);
       },
       p: function update(changed, ctx) {
-        if (changed.currentStep) {
-          toggle_class(button0, "blur", ctx.currentStep < 2);
+        if (changed.hasTutorial || changed.tutorialStep) {
+          toggle_class(button0, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
         }
 
         if (changed.ratingActive) {
           prop_dev(button1, "disabled", ctx.ratingActive);
         }
 
-        if (changed.currentStep) {
-          toggle_class(button1, "blur", ctx.currentStep < 2);
+        if (changed.hasTutorial || changed.tutorialStep) {
+          toggle_class(button1, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
         }
 
         if (changed.segments) {
@@ -43955,11 +43820,11 @@ var app = (function () {
       block: block,
       id: create_else_block_2.name,
       type: "else",
-      source: "(407:10) {:else}",
+      source: "(307:10) {:else}",
       ctx: ctx
     });
     return block;
-  } // (403:10) {#if rate}
+  } // (303:10) {#if rate}
 
 
   function create_if_block_3(ctx) {
@@ -43972,7 +43837,7 @@ var app = (function () {
         t = text("Next");
         attr_dev(button, "class", "button is-primary is-large");
         button.disabled = ctx.nextTrialActive;
-        add_location(button, file$1, 403, 12, 16207);
+        add_location(button, file$1, 303, 12, 10169);
         dispose = listen_dev(button, "click", ctx.finish, false, false, false);
       },
       m: function mount(target, anchor) {
@@ -43993,23 +43858,23 @@ var app = (function () {
       block: block,
       id: create_if_block_3.name,
       type: "if",
-      source: "(403:10) {#if rate}",
+      source: "(303:10) {#if rate}",
       ctx: ctx
     });
     return block;
-  } // (513:2) {:else}
+  } // (413:2) {:else}
 
 
   function create_else_block$1(ctx) {
     var div1;
     var div0;
 
-    function select_block_type_4(changed, ctx) {
+    function select_block_type_3(changed, ctx) {
       if (ctx.segments && ctx.segments.length) return create_if_block_2;
       return create_else_block_1;
     }
 
-    var current_block_type = select_block_type_4(null, ctx);
+    var current_block_type = select_block_type_3(null, ctx);
     var if_block = current_block_type(ctx);
     var block = {
       c: function create() {
@@ -44017,10 +43882,10 @@ var app = (function () {
         div0 = element("div");
         if_block.c();
         attr_dev(div0, "class", "column is-full has-text-centered");
-        add_location(div0, file$1, 515, 6, 20307);
-        attr_dev(div1, "class", "columns is-centered svelte-iib1zu");
-        toggle_class(div1, "blur", ctx.currentStep < 2);
-        add_location(div1, file$1, 514, 4, 20238);
+        add_location(div0, file$1, 415, 6, 14317);
+        attr_dev(div1, "class", "columns is-centered svelte-fkpnm1");
+        toggle_class(div1, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
+        add_location(div1, file$1, 414, 4, 14232);
       },
       m: function mount(target, anchor) {
         insert_dev(target, div1, anchor);
@@ -44028,7 +43893,7 @@ var app = (function () {
         if_block.m(div0, null);
       },
       p: function update(changed, ctx) {
-        if (current_block_type === (current_block_type = select_block_type_4(changed, ctx)) && if_block) {
+        if (current_block_type === (current_block_type = select_block_type_3(changed, ctx)) && if_block) {
           if_block.p(changed, ctx);
         } else {
           if_block.d(1);
@@ -44040,8 +43905,8 @@ var app = (function () {
           }
         }
 
-        if (changed.currentStep) {
-          toggle_class(div1, "blur", ctx.currentStep < 2);
+        if (changed.hasTutorial || changed.tutorialStep) {
+          toggle_class(div1, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
         }
       },
       d: function destroy(detaching) {
@@ -44053,11 +43918,11 @@ var app = (function () {
       block: block,
       id: create_else_block$1.name,
       type: "else",
-      source: "(513:2) {:else}",
+      source: "(413:2) {:else}",
       ctx: ctx
     });
     return block;
-  } // (455:2) {#if rate}
+  } // (355:2) {#if rate}
 
 
   function create_if_block$1(ctx) {
@@ -44139,60 +44004,60 @@ var app = (function () {
         p5 = element("p");
         p5.textContent = "Effortless";
         attr_dev(label, "class", "label has-text-weight-normal is-size-5");
-        add_location(label, file$1, 459, 10, 18205);
+        add_location(label, file$1, 359, 10, 12199);
         attr_dev(input0, "class", input0_class_value = ctx.invalidTime ? "input age-input is-danger" : "input age-input");
         attr_dev(input0, "type", "text");
         attr_dev(input0, "placeholder", "Please enter a timestamp like MM:SS");
-        add_location(input0, file$1, 463, 12, 18370);
+        add_location(input0, file$1, 363, 12, 12364);
         attr_dev(div0, "class", "control");
-        add_location(div0, file$1, 462, 10, 18336);
+        add_location(div0, file$1, 362, 10, 12330);
         attr_dev(div1, "class", "field");
-        add_location(div1, file$1, 458, 8, 18175);
+        add_location(div1, file$1, 358, 8, 12169);
         attr_dev(div2, "class", "column is-narrow has-text-centered");
-        add_location(div2, file$1, 457, 6, 18118);
+        add_location(div2, file$1, 357, 6, 12112);
         attr_dev(p0, "class", "has-text-centered is-size-5");
-        add_location(p0, file$1, 476, 8, 18898);
+        add_location(p0, file$1, 376, 8, 12892);
         attr_dev(input1, "step", "1");
         attr_dev(input1, "min", "0");
         attr_dev(input1, "max", "100");
         attr_dev(input1, "type", "range");
-        add_location(input1, file$1, 477, 8, 18993);
+        add_location(input1, file$1, 377, 8, 12987);
         attr_dev(p1, "class", "subtitle is-size-6");
-        add_location(p1, file$1, 486, 12, 19277);
+        add_location(p1, file$1, 386, 12, 13271);
         attr_dev(div3, "class", "column has-text-left");
-        add_location(div3, file$1, 485, 10, 19230);
+        add_location(div3, file$1, 385, 10, 13224);
         attr_dev(p2, "class", "subtitle is-size-6");
-        add_location(p2, file$1, 489, 12, 19402);
+        add_location(p2, file$1, 389, 12, 13396);
         attr_dev(div4, "class", "column has-text-right");
-        add_location(div4, file$1, 488, 10, 19354);
+        add_location(div4, file$1, 388, 10, 13348);
         attr_dev(div5, "class", "columns is-mobile is-centered");
-        add_location(div5, file$1, 484, 8, 19176);
+        add_location(div5, file$1, 384, 8, 13170);
         attr_dev(div6, "class", "column is-4-desktop is-3-fullhd has-text-centered");
-        add_location(div6, file$1, 475, 6, 18826);
+        add_location(div6, file$1, 375, 6, 12820);
         attr_dev(p3, "class", "has-text-centered is-size-5");
-        add_location(p3, file$1, 494, 8, 19567);
+        add_location(p3, file$1, 394, 8, 13561);
         attr_dev(input2, "step", "1");
         attr_dev(input2, "min", "0");
         attr_dev(input2, "max", "100");
         attr_dev(input2, "type", "range");
-        add_location(input2, file$1, 495, 8, 19661);
+        add_location(input2, file$1, 395, 8, 13655);
         attr_dev(p4, "class", "subtitle is-size-6");
-        add_location(p4, file$1, 504, 12, 19951);
+        add_location(p4, file$1, 404, 12, 13945);
         attr_dev(div7, "class", "column has-text-left");
-        add_location(div7, file$1, 503, 10, 19904);
+        add_location(div7, file$1, 403, 10, 13898);
         attr_dev(p5, "class", "subtitle is-size-6");
-        add_location(p5, file$1, 507, 12, 20071);
+        add_location(p5, file$1, 407, 12, 14065);
         attr_dev(div8, "class", "column has-text-right");
-        add_location(div8, file$1, 506, 10, 20023);
+        add_location(div8, file$1, 406, 10, 14017);
         attr_dev(div9, "class", "columns is-mobile is-centered");
-        add_location(div9, file$1, 502, 8, 19850);
+        add_location(div9, file$1, 402, 8, 13844);
         attr_dev(div10, "class", "column is-4-desktop is-3-fullhd has-text-centered");
-        add_location(div10, file$1, 493, 6, 19495);
+        add_location(div10, file$1, 393, 6, 13489);
         attr_dev(div11, "class", "columns is-centered");
-        add_location(div11, file$1, 456, 4, 18078);
-        dispose = [listen_dev(input0, "input", ctx.input0_input_handler), listen_dev(input0, "keyup", ctx.keyup_handler, false, false, false), listen_dev(input1, "change", ctx.input1_change_input_handler), listen_dev(input1, "input", ctx.input1_change_input_handler), listen_dev(input1, "click", ctx.click_handler_5, {
+        add_location(div11, file$1, 356, 4, 12072);
+        dispose = [listen_dev(input0, "input", ctx.input0_input_handler), listen_dev(input0, "keyup", ctx.keyup_handler, false, false, false), listen_dev(input1, "change", ctx.input1_change_input_handler), listen_dev(input1, "input", ctx.input1_change_input_handler), listen_dev(input1, "click", ctx.click_handler_1, {
           once: true
-        }, false, false), listen_dev(input2, "change", ctx.input2_change_input_handler), listen_dev(input2, "input", ctx.input2_change_input_handler), listen_dev(input2, "click", ctx.click_handler_6, {
+        }, false, false), listen_dev(input2, "change", ctx.input2_change_input_handler), listen_dev(input2, "input", ctx.input2_change_input_handler), listen_dev(input2, "click", ctx.click_handler_2, {
           once: true
         }, false, false)];
       },
@@ -44272,11 +44137,11 @@ var app = (function () {
       block: block,
       id: create_if_block$1.name,
       type: "if",
-      source: "(455:2) {#if rate}",
+      source: "(355:2) {#if rate}",
       ctx: ctx
     });
     return block;
-  } // (538:8) {:else}
+  } // (438:8) {:else}
 
 
   function create_else_block_1(ctx) {
@@ -44286,7 +44151,7 @@ var app = (function () {
         h2 = element("h2");
         h2.textContent = "No Thoughts Tagged";
         attr_dev(h2, "class", "title is-4");
-        add_location(h2, file$1, 538, 10, 21213);
+        add_location(h2, file$1, 438, 10, 15223);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h2, anchor);
@@ -44300,11 +44165,11 @@ var app = (function () {
       block: block,
       id: create_else_block_1.name,
       type: "else",
-      source: "(538:8) {:else}",
+      source: "(438:8) {:else}",
       ctx: ctx
     });
     return block;
-  } // (517:8) {#if segments && segments.length}
+  } // (417:8) {#if segments && segments.length}
 
 
   function create_if_block_2(ctx) {
@@ -44354,16 +44219,16 @@ var app = (function () {
           each_blocks[_i].c();
         }
 
-        add_location(th0, file$1, 521, 18, 20544);
-        add_location(th1, file$1, 522, 18, 20586);
-        add_location(th2, file$1, 523, 18, 20624);
-        add_location(tr, file$1, 520, 16, 20521);
-        add_location(thead, file$1, 519, 14, 20497);
-        add_location(tbody, file$1, 526, 14, 20701);
-        attr_dev(table, "class", "table is-hoverable svelte-iib1zu");
-        add_location(table, file$1, 518, 12, 20448);
+        add_location(th0, file$1, 421, 18, 14554);
+        add_location(th1, file$1, 422, 18, 14596);
+        add_location(th2, file$1, 423, 18, 14634);
+        add_location(tr, file$1, 420, 16, 14531);
+        add_location(thead, file$1, 419, 14, 14507);
+        add_location(tbody, file$1, 426, 14, 14711);
+        attr_dev(table, "class", "table is-hoverable svelte-fkpnm1");
+        add_location(table, file$1, 418, 12, 14458);
         attr_dev(div, "class", "table-container");
-        add_location(div, file$1, 517, 10, 20406);
+        add_location(div, file$1, 417, 10, 14416);
       },
       m: function mount(target, anchor) {
         insert_dev(target, div, anchor);
@@ -44398,11 +44263,11 @@ var app = (function () {
       block: block,
       id: create_if_block_2.name,
       type: "if",
-      source: "(517:8) {#if segments && segments.length}",
+      source: "(417:8) {#if segments && segments.length}",
       ctx: ctx
     });
     return block;
-  } // (528:16) {#each segments as segment, i (segment.id)}
+  } // (428:16) {#each segments as segment, i (segment.id)}
 
 
   function create_each_block(key_1, ctx) {
@@ -44436,13 +44301,13 @@ var app = (function () {
         t5 = space();
         attr_dev(td0, "type", "text");
         attr_dev(td0, "class", "segment-id");
-        add_location(td0, file$1, 529, 20, 20855);
+        add_location(td0, file$1, 429, 20, 14865);
         attr_dev(td1, "type", "number");
-        add_location(td1, file$1, 530, 20, 20952);
+        add_location(td1, file$1, 430, 20, 14962);
         attr_dev(td2, "type", "number");
-        add_location(td2, file$1, 531, 20, 21026);
+        add_location(td2, file$1, 431, 20, 15036);
         attr_dev(tr, "class", "table-row");
-        add_location(tr, file$1, 528, 18, 20787);
+        add_location(tr, file$1, 428, 18, 14797);
         dispose = listen_dev(tr, "click", ctx.selectSegment, false, false, false);
         this.first = tr;
       },
@@ -44472,11 +44337,11 @@ var app = (function () {
       block: block,
       id: create_each_block.name,
       type: "each",
-      source: "(528:16) {#each segments as segment, i (segment.id)}",
+      source: "(428:16) {#each segments as segment, i (segment.id)}",
       ctx: ctx
     });
     return block;
-  } // (471:10) {#if invalidTime}
+  } // (371:10) {#if invalidTime}
 
 
   function create_if_block_1(ctx) {
@@ -44486,7 +44351,7 @@ var app = (function () {
         p = element("p");
         p.textContent = "Invalid timestamp. Please use MM:SS format.";
         attr_dev(p, "class", "help is-danger");
-        add_location(p, file$1, 471, 12, 18702);
+        add_location(p, file$1, 371, 12, 12696);
       },
       m: function mount(target, anchor) {
         insert_dev(target, p, anchor);
@@ -44499,224 +44364,159 @@ var app = (function () {
       block: block,
       id: create_if_block_1.name,
       type: "if",
-      source: "(471:10) {#if invalidTime}",
+      source: "(371:10) {#if invalidTime}",
       ctx: ctx
     });
     return block;
   }
 
   function create_fragment$1(ctx) {
+    var div11;
+    var div2;
     var div1;
-    var div0;
-    var header;
-    var p;
     var t0;
     var t1;
-    var section;
+    var div0;
     var t2;
-    var footer;
-    var div1_class_value;
-    var t3;
-    var div13;
-    var div4;
-    var div3;
-    var h1;
-    var t5;
-    var t6;
-    var div2;
-    var t7;
-    var div12;
-    var div11;
     var div10;
+    var div9;
     var div8;
-    var div7;
+    var div6;
     var div5;
+    var div3;
     var audio;
     var source;
     var source_src_value;
-    var t8;
-    var t9;
-    var div6;
-    var span;
-    var i;
-    var t10;
-    var div9;
-    var t11;
-    var dispose;
+    var t3;
+    var t4;
+    var div4;
+    var t5;
+    var div7;
+    var t6;
 
     function select_block_type(changed, ctx) {
-      if (ctx.quizComplete) return create_if_block_5;
+      if (ctx.hasTutorial) return create_if_block_6;
       return create_else_block_3;
     }
 
     var current_block_type = select_block_type(null, ctx);
     var if_block0 = current_block_type(ctx);
-    var if_block1 = ctx.peaksLoading && create_if_block_4(ctx);
+    var if_block1 = ctx.peaksLoading && create_if_block_5(ctx);
+    var if_block2 = ctx.hasTutorial && create_if_block_4(ctx);
 
-    function select_block_type_2(changed, ctx) {
+    function select_block_type_1(changed, ctx) {
       if (ctx.rate) return create_if_block_3;
       return create_else_block_2;
     }
 
-    var current_block_type_1 = select_block_type_2(null, ctx);
-    var if_block2 = current_block_type_1(ctx);
+    var current_block_type_1 = select_block_type_1(null, ctx);
+    var if_block3 = current_block_type_1(ctx);
 
-    function select_block_type_3(changed, ctx) {
+    function select_block_type_2(changed, ctx) {
       if (ctx.rate) return create_if_block$1;
       return create_else_block$1;
     }
 
-    var current_block_type_2 = select_block_type_3(null, ctx);
-    var if_block3 = current_block_type_2(ctx);
+    var current_block_type_2 = select_block_type_2(null, ctx);
+    var if_block4 = current_block_type_2(ctx);
     var block = {
       c: function create() {
-        div1 = element("div");
-        div0 = element("div");
-        header = element("header");
-        p = element("p");
-        t0 = text(ctx.tutorialState);
-        t1 = space();
-        section = element("section");
-        t2 = space();
-        footer = element("footer");
-        if_block0.c();
-        t3 = space();
-        div13 = element("div");
-        div4 = element("div");
-        div3 = element("div");
-        h1 = element("h1");
-        h1.textContent = "Example Audio";
-        t5 = space();
-        if (if_block1) if_block1.c();
-        t6 = space();
-        div2 = element("div");
-        t7 = space();
-        div12 = element("div");
         div11 = element("div");
+        div2 = element("div");
+        div1 = element("div");
+        if_block0.c();
+        t0 = space();
+        if (if_block1) if_block1.c();
+        t1 = space();
+        div0 = element("div");
+        t2 = space();
         div10 = element("div");
+        div9 = element("div");
         div8 = element("div");
-        div7 = element("div");
+        div6 = element("div");
         div5 = element("div");
+        div3 = element("div");
         audio = element("audio");
         source = element("source");
-        t8 = text("\n                Your browser does not support the audio element.");
-        t9 = space();
-        div6 = element("div");
-        span = element("span");
-        i = element("i");
-        t10 = space();
-        div9 = element("div");
-        if_block2.c();
-        t11 = space();
+        t3 = text("\n                Your browser does not support the audio element.");
+        t4 = space();
+        div4 = element("div");
+        if (if_block2) if_block2.c();
+        t5 = space();
+        div7 = element("div");
         if_block3.c();
-        attr_dev(p, "class", "modal-card-title");
-        add_location(p, file$1, 300, 6, 12797);
-        attr_dev(header, "class", "modal-card-head");
-        add_location(header, file$1, 299, 4, 12758);
-        attr_dev(section, "class", "modal-card-body");
-        add_location(section, file$1, 302, 4, 12863);
-        attr_dev(footer, "class", "modal-card-foot");
-        add_location(footer, file$1, 307, 4, 12948);
-        attr_dev(div0, "class", "modal-card svelte-iib1zu");
-        attr_dev(div0, "id", "modal");
-        toggle_class(div0, "up", ctx.up);
-        toggle_class(div0, "right", ctx.right);
-        toggle_class(div0, "down", ctx.down);
-        toggle_class(div0, "upp", ctx.upp);
-        add_location(div0, file$1, 298, 2, 12676);
-        attr_dev(div1, "class", div1_class_value = "" + (null_to_empty(ctx.modalOpen ? "modal is-active" : "modal") + " svelte-iib1zu"));
-        add_location(div1, file$1, 293, 0, 12501);
-        attr_dev(h1, "class", "title");
-        add_location(h1, file$1, 370, 6, 14931);
-        attr_dev(div2, "id", "waveform-container");
-        attr_dev(div2, "class", "svelte-iib1zu");
-        toggle_class(div2, "blur", ctx.currentStep < 1);
-        add_location(div2, file$1, 375, 6, 15142);
-        attr_dev(div3, "class", "column is-full has-text-centered");
-        add_location(div3, file$1, 369, 4, 14878);
-        attr_dev(div4, "class", "columns is-centered");
-        add_location(div4, file$1, 368, 2, 14840);
+        t6 = space();
+        if_block4.c();
+        attr_dev(div0, "id", "waveform-container");
+        attr_dev(div0, "class", "svelte-fkpnm1");
+        toggle_class(div0, "blur", ctx.hasTutorial && ctx.tutorialStep < 1);
+        add_location(div0, file$1, 276, 6, 9054);
+        attr_dev(div1, "class", "column is-full has-text-centered");
+        add_location(div1, file$1, 266, 4, 8677);
+        attr_dev(div2, "class", "columns is-centered");
+        attr_dev(div2, "id", "row-title-waveform");
+        add_location(div2, file$1, 265, 2, 8615);
         if (source.src !== (source_src_value = ctx.src)) attr_dev(source, "src", source_src_value);
         attr_dev(source, "type", "audio/wav");
-        add_location(source, file$1, 387, 16, 15661);
+        add_location(source, file$1, 288, 16, 9650);
         attr_dev(audio, "id", "audio");
         audio.controls = "controls";
         attr_dev(audio, "controlslist", "nodownload");
-        add_location(audio, file$1, 386, 14, 15580);
-        attr_dev(div5, "class", "column is-narrow");
-        add_location(div5, file$1, 385, 12, 15535);
-        attr_dev(i, "class", "fas fa-question-circle fa-2x fa-fw");
-        add_location(i, file$1, 396, 16, 16023);
-        attr_dev(span, "class", "icon is-large");
-        toggle_class(span, "is-invisible", !ctx.tutorialComplete);
-        add_location(span, file$1, 392, 14, 15849);
-        attr_dev(div6, "class", "column");
-        add_location(div6, file$1, 391, 12, 15814);
-        attr_dev(div7, "class", "columns is-gapless is-mobile");
-        add_location(div7, file$1, 384, 10, 15480);
-        attr_dev(div8, "class", "column is-narrow");
-        add_location(div8, file$1, 383, 8, 15439);
-        attr_dev(div9, "class", "column");
-        add_location(div9, file$1, 401, 8, 16153);
-        attr_dev(div10, "class", "columns");
-        add_location(div10, file$1, 382, 6, 15409);
-        attr_dev(div11, "class", "column is-full");
-        add_location(div11, file$1, 380, 4, 15296);
-        attr_dev(div12, "class", "columns is-centered");
-        add_location(div12, file$1, 379, 2, 15258);
-        attr_dev(div13, "class", "container is-fluid svelte-iib1zu");
-        toggle_class(div13, "blur", ctx.tutorialState === "Overview" || ctx.tutorialSubmitted || ctx.quizFailed);
-        add_location(div13, file$1, 364, 0, 14684);
-        dispose = [listen_dev(div1, "mousedown", prevent_default(ctx.dragStart), false, false, true), listen_dev(div1, "mouseup", prevent_default(ctx.dragEnd), false, false, true), listen_dev(div1, "mousemove", prevent_default(ctx.drag), false, false, true), listen_dev(span, "click", ctx.click_handler_4, false, false, false)];
+        add_location(audio, file$1, 287, 14, 9569);
+        attr_dev(div3, "class", "column is-narrow");
+        add_location(div3, file$1, 286, 12, 9524);
+        attr_dev(div4, "class", "column");
+        add_location(div4, file$1, 292, 12, 9803);
+        attr_dev(div5, "class", "columns is-gapless is-mobile");
+        add_location(div5, file$1, 285, 10, 9469);
+        attr_dev(div6, "class", "column is-narrow");
+        add_location(div6, file$1, 284, 8, 9428);
+        attr_dev(div7, "class", "column");
+        add_location(div7, file$1, 301, 8, 10115);
+        attr_dev(div8, "class", "columns");
+        add_location(div8, file$1, 283, 6, 9398);
+        attr_dev(div9, "class", "column is-full");
+        attr_dev(div9, "id", "playback-controls-info-column");
+        add_location(div9, file$1, 281, 4, 9250);
+        attr_dev(div10, "class", "columns is-centered");
+        attr_dev(div10, "id", "row-controls-buttons");
+        add_location(div10, file$1, 280, 2, 9186);
+        attr_dev(div11, "class", "container is-fluid svelte-fkpnm1");
+        toggle_class(div11, "blur", ctx.hasTutorial && (ctx.tutorialStep === 0 || ctx.quizState === "fail" || ctx.quizState === "readyForExperiment"));
+        add_location(div11, file$1, 261, 0, 8425);
       },
       l: function claim(nodes) {
         throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
       },
       m: function mount(target, anchor) {
-        insert_dev(target, div1, anchor);
+        insert_dev(target, div11, anchor);
+        append_dev(div11, div2);
+        append_dev(div2, div1);
+        if_block0.m(div1, null);
+        append_dev(div1, t0);
+        if (if_block1) if_block1.m(div1, null);
+        append_dev(div1, t1);
         append_dev(div1, div0);
-        append_dev(div0, header);
-        append_dev(header, p);
-        append_dev(p, t0);
-        append_dev(div0, t1);
-        append_dev(div0, section);
-        section.innerHTML = ctx.tutorialContent;
-        append_dev(div0, t2);
-        append_dev(div0, footer);
-        if_block0.m(footer, null);
-        insert_dev(target, t3, anchor);
-        insert_dev(target, div13, anchor);
-        append_dev(div13, div4);
-        append_dev(div4, div3);
-        append_dev(div3, h1);
-        append_dev(div3, t5);
-        if (if_block1) if_block1.m(div3, null);
-        append_dev(div3, t6);
-        append_dev(div3, div2);
-        append_dev(div13, t7);
-        append_dev(div13, div12);
-        append_dev(div12, div11);
+        append_dev(div11, t2);
         append_dev(div11, div10);
-        append_dev(div10, div8);
-        append_dev(div8, div7);
-        append_dev(div7, div5);
-        append_dev(div5, audio);
-        append_dev(audio, source);
-        append_dev(audio, t8);
-        append_dev(div7, t9);
-        append_dev(div7, div6);
-        append_dev(div6, span);
-        append_dev(span, i);
-        append_dev(div10, t10);
         append_dev(div10, div9);
-        if_block2.m(div9, null);
-        append_dev(div13, t11);
-        if_block3.m(div13, null);
+        append_dev(div9, div8);
+        append_dev(div8, div6);
+        append_dev(div6, div5);
+        append_dev(div5, div3);
+        append_dev(div3, audio);
+        append_dev(audio, source);
+        append_dev(audio, t3);
+        append_dev(div5, t4);
+        append_dev(div5, div4);
+        if (if_block2) if_block2.m(div4, null);
+        append_dev(div8, t5);
+        append_dev(div8, div7);
+        if_block3.m(div7, null);
+        append_dev(div11, t6);
+        if_block4.m(div11, null);
       },
       p: function update(changed, ctx) {
-        if (changed.tutorialState) set_data_dev(t0, ctx.tutorialState);
-        if (changed.tutorialContent) section.innerHTML = ctx.tutorialContent;
-
         if (current_block_type === (current_block_type = select_block_type(changed, ctx)) && if_block0) {
           if_block0.p(changed, ctx);
         } else {
@@ -44725,92 +44525,79 @@ var app = (function () {
 
           if (if_block0) {
             if_block0.c();
-            if_block0.m(footer, null);
+            if_block0.m(div1, t0);
           }
-        }
-
-        if (changed.up) {
-          toggle_class(div0, "up", ctx.up);
-        }
-
-        if (changed.right) {
-          toggle_class(div0, "right", ctx.right);
-        }
-
-        if (changed.down) {
-          toggle_class(div0, "down", ctx.down);
-        }
-
-        if (changed.upp) {
-          toggle_class(div0, "upp", ctx.upp);
-        }
-
-        if (changed.modalOpen && div1_class_value !== (div1_class_value = "" + (null_to_empty(ctx.modalOpen ? "modal is-active" : "modal") + " svelte-iib1zu"))) {
-          attr_dev(div1, "class", div1_class_value);
         }
 
         if (ctx.peaksLoading) {
           if (!if_block1) {
-            if_block1 = create_if_block_4(ctx);
+            if_block1 = create_if_block_5(ctx);
             if_block1.c();
-            if_block1.m(div3, t6);
+            if_block1.m(div1, t1);
           }
         } else if (if_block1) {
           if_block1.d(1);
           if_block1 = null;
         }
 
-        if (changed.currentStep) {
-          toggle_class(div2, "blur", ctx.currentStep < 1);
+        if (changed.hasTutorial || changed.tutorialStep) {
+          toggle_class(div0, "blur", ctx.hasTutorial && ctx.tutorialStep < 1);
         }
 
         if (changed.src && source.src !== (source_src_value = ctx.src)) {
           attr_dev(source, "src", source_src_value);
         }
 
-        if (changed.tutorialComplete) {
-          toggle_class(span, "is-invisible", !ctx.tutorialComplete);
-        }
-
-        if (current_block_type_1 === (current_block_type_1 = select_block_type_2(changed, ctx)) && if_block2) {
-          if_block2.p(changed, ctx);
-        } else {
-          if_block2.d(1);
-          if_block2 = current_block_type_1(ctx);
-
+        if (ctx.hasTutorial) {
           if (if_block2) {
+            if_block2.p(changed, ctx);
+          } else {
+            if_block2 = create_if_block_4(ctx);
             if_block2.c();
-            if_block2.m(div9, null);
+            if_block2.m(div4, null);
           }
+        } else if (if_block2) {
+          if_block2.d(1);
+          if_block2 = null;
         }
 
-        if (current_block_type_2 === (current_block_type_2 = select_block_type_3(changed, ctx)) && if_block3) {
+        if (current_block_type_1 === (current_block_type_1 = select_block_type_1(changed, ctx)) && if_block3) {
           if_block3.p(changed, ctx);
         } else {
           if_block3.d(1);
-          if_block3 = current_block_type_2(ctx);
+          if_block3 = current_block_type_1(ctx);
 
           if (if_block3) {
             if_block3.c();
-            if_block3.m(div13, null);
+            if_block3.m(div7, null);
           }
         }
 
-        if (changed.tutorialState || changed.tutorialSubmitted || changed.quizFailed) {
-          toggle_class(div13, "blur", ctx.tutorialState === "Overview" || ctx.tutorialSubmitted || ctx.quizFailed);
+        if (current_block_type_2 === (current_block_type_2 = select_block_type_2(changed, ctx)) && if_block4) {
+          if_block4.p(changed, ctx);
+        } else {
+          if_block4.d(1);
+          if_block4 = current_block_type_2(ctx);
+
+          if (if_block4) {
+            if_block4.c();
+            if_block4.m(div11, null);
+          }
+        }
+
+        if (changed.hasTutorial || changed.tutorialStep || changed.quizState) {
+          toggle_class(div11, "blur", ctx.hasTutorial && (ctx.tutorialStep === 0 || ctx.quizState === "fail" || ctx.quizState === "readyForExperiment"));
         }
       },
       i: noop,
       o: noop,
       d: function destroy(detaching) {
-        if (detaching) detach_dev(div1);
+        if (detaching) detach_dev(div11);
         if_block0.d();
-        if (detaching) detach_dev(t3);
-        if (detaching) detach_dev(div13);
         if (if_block1) if_block1.d();
-        if_block2.d();
+        if (if_block2) if_block2.d();
         if_block3.d();
-        run_all(dispose);
+        if_block4.d();
       }
     };
     dispatch_dev("SvelteRegisterBlock", {
@@ -44825,1427 +44612,38 @@ var app = (function () {
 
   function instance$1($$self, $$props, $$invalidate) {
     var src = $$props.src;
-    var peaksInstance;
-    var segments = [];
-    var selectedSegmentId;
-    var rowSelected = false;
-    var segmentPrevMax = 0;
-    var dispatch = createEventDispatcher();
-    var peaksLoading = true;
-    var rate = false;
-    var confidence = 50;
-    var clarity = 50;
-    var clarityRated = false;
-    var confidenceRated = false;
-    var time = "";
-    var timer;
-    var invalidTime = false;
-    var modalOpen;
-    var tutorialSteps = ["Overview", "Recording Display", "Controls", "Tagging Thoughts", "Comprehension Check"];
-    var currentStep = 0;
-    var modalXInitial;
-    var modalYInitial;
-    var modalXCurrent;
-    var modalYCurrent;
-    var modalXOffset = 0;
-    var modalYOffset = 0;
-    var dragActive = false;
-    var tutorialComplete = false;
-    var quizComplete = false;
-    var quizFailed = false;
-    var tutorialSubmitted = false;
-    var tutorialInstructions = ["<p>This brief tutorial will introduce you to the interface you will use to complete the task. Feel free to drag and reposition this popup as you progress through each step of the tutorial.</p>", "<p>This part of the screen creen contains a visual representation of the audio recording. The top half of this display (in green) shows a zoomed in view of an <strong>audio snippet</strong> of the recording, while the bottom half displays the <strong>full recording</strong> along with a box highlighting the <strong>location of the snippet</strong> within the full recording. Below this are playback controls you can use to play, pause, and adjust the volume of the recording. Playback is synchronized between these controls and the visual display.</p><p>You can move to a specific location within the snippet or within the full recording by <strong>clicking</strong> in the top or bottom display respectively. This will move the vertical position indicator to a new timepoint in both displays. You can also scrub through the snippet or full recording by <strong>clicking & dragging</strong> left or right.</p><br/><p>Feel free to click around within this display to get a feel for how you can control your position within the recording.</p>", "<p>Next to the audio controls you will also find buttons to tag a new thought and submit your responses when you are finished tagging thoughts in this audio file. Below this you will see a section that lists your currently tagged thoughts. As you can see currently no thoughts have been tagged so nothing is visible.</p><br/><p><strong>Try clicking the Tag thought button now.</strong></p>", "Notice how this added a row to the table along with markers to the visual display above. The <span class=\"has-text-weight-bold has-text-grey\">start marker (light grey)</span> indicates the beginning of a tag based on your current position in the audio file. The <span class=\"has-text-weight-bold has-text-grey-darker\">end marker (dark grey)</span> indicates the end of a tag and defaults to 5 seconds after the start marker. <br><br>You should edit these times to match when when you think a new thought begins and when that same thought ends. To edit these times first select this thought by <strong>clicking on its row</strong> within the table. Then <strong>drag the markers</strong> in the display above to make an adjustment. Notice how the values in the table change in sync with your actions in the display above. You can also delete a tag or play audio within a tag verify your work using the buttons that appear. After you finish editing just click on the same thought in the table to deselect it.", "You now know how to use the controls. Try to identify <strong>three thoughts</strong> within this audio file to continue. We will verify your tags to determine your eligibility to continue with this HIT and earn a bonus payment for tagging more files. If you fail to correctly identify these thoughts you will be paid for the HIT but will not be permitted to continute tagging. You can bring up this guide by clicking the help icon next to the audio controls."];
-    var quizOutcome = ["<div class=\"content\"><p>Nice job! You did exactly what were looking for. After you finish tagging thoughts there are 3 additional questions we would like you input before submitting your tags.<ol class=\"1\"><li>The approximate time that the speaker in the recording stopped talking</li><li>The clarity of the audio recording</li><li>The difficulty of identifying thoughts based on the speaker style</li><ol>Please complete these now and click the Next button.</p></div>", "<p>Perfect! You are now eligible to tag more recordings. You will earn a $0.50 bonus for each additional recording you tag thoughts for. Otherwise you can complete this HIT and earn your payment without any bonuses. Please select your preference below </p>", "<p>Hmm your tags are not quite what we are looking for. We have highlighted the tags you made below that do not line up with what we expected. Please adjust your tags and click Done to try verifying your responses again. <br><br> You will only have <strong>1 more chance</strong> to identify the correct tags before you forfeit any bonus payments.</p>", "<p>Unfortunately your tags still do not reflect what we are looking for. Therefore you can no longer continue with this HIT and earn bonus payments.<br><br>Do not worry, you will still be compensenated the base payment for this HIT.</p>"];
+    var _$$props$currentTrial = $$props.currentTrial,
+        currentTrial = _$$props$currentTrial === void 0 ? NaN : _$$props$currentTrial;
+    var _$$props$fileName = $$props.fileName,
+        fileName = _$$props$fileName === void 0 ? "" : _$$props$fileName;
+    var _$$props$tutorialStep = $$props.tutorialStep,
+        tutorialStep = _$$props$tutorialStep === void 0 ? -1 : _$$props$tutorialStep;
+    var _$$props$hasTutorial = $$props.hasTutorial,
+        hasTutorial = _$$props$hasTutorial === void 0 ? false : _$$props$hasTutorial;
+    var _$$props$quizAnswers = $$props.quizAnswers,
+        quizAnswers = _$$props$quizAnswers === void 0 ? [] : _$$props$quizAnswers;
+    var _$$props$quizState = $$props.quizState,
+        quizState = _$$props$quizState === void 0 ? "" : _$$props$quizState;
+    var subjectId;
+    var character;
 
-    var backward = function backward() {
-      $$invalidate("currentStep", currentStep -= 1);
-      $$invalidate("currentStep", currentStep = Math.max(currentStep, 0));
-      console.log(tutorialSteps[currentStep]);
-    };
+    if (fileName) {
+      var _fileName$split = fileName.split("_");
 
-    var forward = function forward() {
-      $$invalidate("currentStep", currentStep = Math.min(currentStep + 1, tutorialSteps.length - 1));
+      var _fileName$split2 = _slicedToArray(_fileName$split, 2);
 
-      if (currentStep === tutorialSteps.length - 1) {
-        $$invalidate("tutorialComplete", tutorialComplete = true);
-      }
+      subjectId = _fileName$split2[0];
+      character = _fileName$split2[1];
 
-      console.log(tutorialSteps[currentStep]);
-    };
+      var _character$split = character.split("_");
 
-    var setTranslate = function setTranslate(xPos, yPos, el) {
-      el.style.transform = "translate3d(".concat(xPos, "px, ").concat(yPos, "px, 0)");
-    };
+      var _character$split2 = _slicedToArray(_character$split, 1);
 
-    var dragStart = function dragStart(ev) {
-      if (ev.target.parentElement.closest(".modal")) {
-        modalXInitial = ev.clientX - modalXOffset;
-        modalYInitial = ev.clientY - modalYOffset;
-        dragActive = true;
-      }
-    };
-
-    var drag = function drag(ev) {
-      if (dragActive) {
-        modalXCurrent = ev.clientX - modalXInitial;
-        modalYCurrent = ev.clientY - modalYInitial;
-        modalXOffset = modalXCurrent;
-        modalYOffset = modalYCurrent;
-        var el = document.getElementById("modal");
-        setTranslate(modalXCurrent, modalYCurrent, el);
-      }
-    };
-
-    var dragEnd = function dragEnd(ev) {
-      modalXInitial = modalXCurrent;
-      modalYInitial = modalYCurrent;
-      dragActive = false;
-    };
-
-    var debounce = function debounce(v) {
-      clearTimeout(timer);
-      timer = setTimeout(function () {
-        if (time.length === 5 && time.includes(":") || !time) {
-          $$invalidate("invalidTime", invalidTime = false);
-        } else {
-          $$invalidate("invalidTime", invalidTime = true);
-        }
-      }, 600);
-    };
-
-    var checkQuiz = function checkQuiz() {
-      if (segments.length === 3) {
-        $$invalidate("quizComplete", quizComplete = true);
-        $$invalidate("tutorialContent", tutorialContent = quizOutcome[0]);
-        $$invalidate("rate", rate = true);
-      } else {
-        $$invalidate("quizComplete", quizComplete = true);
-        $$invalidate("quizFailed", quizFailed = true);
-        $$invalidate("tutorialContent", tutorialContent = quizOutcome[3]);
-      }
-    };
-
-    onMount(function () {
-      var options = {
-        container: document.getElementById("waveform-container"),
-        mediaElement: document.getElementById("audio"),
-        webAudio: {
-          audioContext: new AudioContext()
-        },
-        keyboard: false,
-        pointMarkerColor: "#006eb0",
-        showPlayheadTime: true,
-        inMarkerColor: "#999999",
-        outMarkerColor: "#3d3d3d"
-      };
-      $$invalidate("modalOpen", modalOpen = true);
-      peaksInstance = Peaks.init(options, function (err) {
-        if (err) {
-          console.error(err);
-        } else {
-          $$invalidate("peaksLoading", peaksLoading = false);
-          console.log("Peaks instance ready");
-          $$invalidate("segments", segments = peaksInstance.segments.getSegments());
-        }
-      });
-      peaksInstance.on("segments.mouseleave", function (segment) {
-        $$invalidate("segments", segments = peaksInstance.segments.getSegments());
-      });
-      peaksInstance.on("segments.click", function (segment) {
-        $$invalidate("segments", segments = peaksInstance.segments.getSegments());
-      });
-      peaksInstance.on("segments.dragged", function (segment) {
-        $$invalidate("segments", segments = peaksInstance.segments.getSegments());
-      });
-    });
-
-    var finish = function finish() {
-      $$invalidate("tutorialSubmitted", tutorialSubmitted = true);
-      $$invalidate("tutorialContent", tutorialContent = quizOutcome[1]);
-      $$invalidate("modalOpen", modalOpen = true);
-    };
-
-    var submitTags = function submitTags() {
-      if (!segments || segments && segments.length <= 2) {
-        alert("Please tag a few more thoughts");
-      } else {
-        checkQuiz();
-        $$invalidate("modalOpen", modalOpen = true);
-      }
-    };
-
-    function addSegment() {
-      peaksInstance.segments.add({
-        startTime: peaksInstance.player.getCurrentTime(),
-        endTime: peaksInstance.player.getCurrentTime() + 5,
-        labelText: "Thought ".concat(segmentPrevMax.toString()),
-        editable: true
-      });
-      $$invalidate("segments", segments = peaksInstance.segments.getSegments());
-      segmentPrevMax += 1;
-
-      if (currentStep === 2) {
-        forward();
-      }
+      character = _character$split2[0];
     }
 
-    function selectSegment(ev) {
-      var rows = document.getElementsByClassName("table-row");
-      var row = ev.target.parentNode;
-
-      if (row.className === "table-row is-selected") {
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
-
-        try {
-          for (var _iterator = rows[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var r = _step.value;
-            r.className = "table-row";
-          }
-        } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) {
-              _iterator.return();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
-          }
-        }
-
-        $$invalidate("rowSelected", rowSelected = false);
-      } else {
-        var _iteratorNormalCompletion2 = true;
-        var _didIteratorError2 = false;
-        var _iteratorError2 = undefined;
-
-        try {
-          for (var _iterator2 = rows[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-            var _r = _step2.value;
-            _r.className = "table-row";
-          }
-        } catch (err) {
-          _didIteratorError2 = true;
-          _iteratorError2 = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion2 && _iterator2.return != null) {
-              _iterator2.return();
-            }
-          } finally {
-            if (_didIteratorError2) {
-              throw _iteratorError2;
-            }
-          }
-        }
-
-        row.className += " is-selected";
-        $$invalidate("rowSelected", rowSelected = true);
-      }
-
-      selectedSegmentId = parseInt(row.querySelector("td.segment-id").innerText, 10);
-      selectedSegmentId = "peaks.segment.".concat(selectedSegmentId.toString());
-    }
-
-    function playSegment() {
-      var segment = peaksInstance.segments.getSegment(selectedSegmentId);
-      peaksInstance.player.playSegment(segment);
-    }
-
-    function deleteSegment() {
-      peaksInstance.segments.removeById(selectedSegmentId);
-      var rows = document.getElementsByClassName("table-row");
-      var _iteratorNormalCompletion3 = true;
-      var _didIteratorError3 = false;
-      var _iteratorError3 = undefined;
-
-      try {
-        for (var _iterator3 = rows[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
-          var r = _step3.value;
-          r.className = "table-row";
-        }
-      } catch (err) {
-        _didIteratorError3 = true;
-        _iteratorError3 = err;
-      } finally {
-        try {
-          if (!_iteratorNormalCompletion3 && _iterator3.return != null) {
-            _iterator3.return();
-          }
-        } finally {
-          if (_didIteratorError3) {
-            throw _iteratorError3;
-          }
-        }
-      }
-
-      $$invalidate("rowSelected", rowSelected = false);
-      $$invalidate("segments", segments = peaksInstance.segments.getSegments());
-    }
-
-    var writable_props = ["src"];
-    Object.keys($$props).forEach(function (key) {
-      if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1.warn("<Quiz> was created with unknown prop '".concat(key, "'"));
-    });
-
-    var click_handler = function click_handler() {
-      return dispatch("finishedComplete");
-    };
-
-    var click_handler_1 = function click_handler_1() {
-      return dispatch("finishedContinue");
-    };
-
-    var click_handler_2 = function click_handler_2() {
-      return dispatch("finishedComplete");
-    };
-
-    var click_handler_3 = function click_handler_3() {
-      $$invalidate("modalOpen", modalOpen = !modalOpen);
-    };
-
-    var click_handler_4 = function click_handler_4() {
-      return $$invalidate("modalOpen", modalOpen = !modalOpen);
-    };
-
-    function input0_input_handler() {
-      time = this.value;
-      $$invalidate("time", time);
-    }
-
-    var keyup_handler = function keyup_handler(ev) {
-      return debounce(ev.target.value);
-    };
-
-    function input1_change_input_handler() {
-      clarity = to_number(this.value);
-      $$invalidate("clarity", clarity);
-    }
-
-    var click_handler_5 = function click_handler_5() {
-      return $$invalidate("clarityRated", clarityRated = true);
-    };
-
-    function input2_change_input_handler() {
-      confidence = to_number(this.value);
-      $$invalidate("confidence", confidence);
-    }
-
-    var click_handler_6 = function click_handler_6() {
-      return $$invalidate("confidenceRated", confidenceRated = true);
-    };
-
-    $$self.$set = function ($$props) {
-      if ("src" in $$props) $$invalidate("src", src = $$props.src);
-    };
-
-    $$self.$capture_state = function () {
-      return {
-        src: src,
-        peaksInstance: peaksInstance,
-        segments: segments,
-        selectedSegmentId: selectedSegmentId,
-        rowSelected: rowSelected,
-        segmentPrevMax: segmentPrevMax,
-        peaksLoading: peaksLoading,
-        rate: rate,
-        confidence: confidence,
-        clarity: clarity,
-        clarityRated: clarityRated,
-        confidenceRated: confidenceRated,
-        time: time,
-        timer: timer,
-        invalidTime: invalidTime,
-        modalOpen: modalOpen,
-        currentStep: currentStep,
-        modalXInitial: modalXInitial,
-        modalYInitial: modalYInitial,
-        modalXCurrent: modalXCurrent,
-        modalYCurrent: modalYCurrent,
-        modalXOffset: modalXOffset,
-        modalYOffset: modalYOffset,
-        dragActive: dragActive,
-        tutorialComplete: tutorialComplete,
-        quizComplete: quizComplete,
-        quizFailed: quizFailed,
-        tutorialSubmitted: tutorialSubmitted,
-        nextTrialActive: nextTrialActive,
-        ratingActive: ratingActive,
-        tutorialState: tutorialState,
-        down: down,
-        up: up,
-        right: right,
-        upp: upp,
-        tutorialContent: tutorialContent
-      };
-    };
-
-    $$self.$inject_state = function ($$props) {
-      if ("src" in $$props) $$invalidate("src", src = $$props.src);
-      if ("peaksInstance" in $$props) peaksInstance = $$props.peaksInstance;
-      if ("segments" in $$props) $$invalidate("segments", segments = $$props.segments);
-      if ("selectedSegmentId" in $$props) selectedSegmentId = $$props.selectedSegmentId;
-      if ("rowSelected" in $$props) $$invalidate("rowSelected", rowSelected = $$props.rowSelected);
-      if ("segmentPrevMax" in $$props) segmentPrevMax = $$props.segmentPrevMax;
-      if ("peaksLoading" in $$props) $$invalidate("peaksLoading", peaksLoading = $$props.peaksLoading);
-      if ("rate" in $$props) $$invalidate("rate", rate = $$props.rate);
-      if ("confidence" in $$props) $$invalidate("confidence", confidence = $$props.confidence);
-      if ("clarity" in $$props) $$invalidate("clarity", clarity = $$props.clarity);
-      if ("clarityRated" in $$props) $$invalidate("clarityRated", clarityRated = $$props.clarityRated);
-      if ("confidenceRated" in $$props) $$invalidate("confidenceRated", confidenceRated = $$props.confidenceRated);
-      if ("time" in $$props) $$invalidate("time", time = $$props.time);
-      if ("timer" in $$props) timer = $$props.timer;
-      if ("invalidTime" in $$props) $$invalidate("invalidTime", invalidTime = $$props.invalidTime);
-      if ("modalOpen" in $$props) $$invalidate("modalOpen", modalOpen = $$props.modalOpen);
-      if ("currentStep" in $$props) $$invalidate("currentStep", currentStep = $$props.currentStep);
-      if ("modalXInitial" in $$props) modalXInitial = $$props.modalXInitial;
-      if ("modalYInitial" in $$props) modalYInitial = $$props.modalYInitial;
-      if ("modalXCurrent" in $$props) modalXCurrent = $$props.modalXCurrent;
-      if ("modalYCurrent" in $$props) modalYCurrent = $$props.modalYCurrent;
-      if ("modalXOffset" in $$props) modalXOffset = $$props.modalXOffset;
-      if ("modalYOffset" in $$props) modalYOffset = $$props.modalYOffset;
-      if ("dragActive" in $$props) dragActive = $$props.dragActive;
-      if ("tutorialComplete" in $$props) $$invalidate("tutorialComplete", tutorialComplete = $$props.tutorialComplete);
-      if ("quizComplete" in $$props) $$invalidate("quizComplete", quizComplete = $$props.quizComplete);
-      if ("quizFailed" in $$props) $$invalidate("quizFailed", quizFailed = $$props.quizFailed);
-      if ("tutorialSubmitted" in $$props) $$invalidate("tutorialSubmitted", tutorialSubmitted = $$props.tutorialSubmitted);
-      if ("nextTrialActive" in $$props) $$invalidate("nextTrialActive", nextTrialActive = $$props.nextTrialActive);
-      if ("ratingActive" in $$props) $$invalidate("ratingActive", ratingActive = $$props.ratingActive);
-      if ("tutorialState" in $$props) $$invalidate("tutorialState", tutorialState = $$props.tutorialState);
-      if ("down" in $$props) $$invalidate("down", down = $$props.down);
-      if ("up" in $$props) $$invalidate("up", up = $$props.up);
-      if ("right" in $$props) $$invalidate("right", right = $$props.right);
-      if ("upp" in $$props) $$invalidate("upp", upp = $$props.upp);
-      if ("tutorialContent" in $$props) $$invalidate("tutorialContent", tutorialContent = $$props.tutorialContent);
-    };
-
-    var nextTrialActive;
-    var ratingActive;
-    var tutorialState;
-    var down;
-    var up;
-    var right;
-    var upp;
-    var tutorialContent;
-
-    $$self.$$.update = function () {
-      var changed = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {
-        clarityRated: 1,
-        confidenceRated: 1,
-        time: 1,
-        invalidTime: 1,
-        segments: 1,
-        currentStep: 1,
-        quizComplete: 1
-      };
-
-      if (changed.clarityRated || changed.confidenceRated || changed.time || changed.invalidTime) {
-         $$invalidate("nextTrialActive", nextTrialActive = !(clarityRated && confidenceRated && time && !invalidTime));
-      }
-
-      if (changed.segments) {
-         $$invalidate("ratingActive", ratingActive = segments.length === 0);
-      }
-
-      if (changed.currentStep) {
-         $$invalidate("tutorialState", tutorialState = tutorialSteps[currentStep]);
-      }
-
-      if (changed.currentStep) {
-         $$invalidate("down", down = currentStep === 1);
-      }
-
-      if (changed.currentStep || changed.quizComplete) {
-         $$invalidate("up", up = currentStep === 2 || quizComplete);
-      }
-
-      if (changed.currentStep) {
-         $$invalidate("right", right = currentStep === 3 || currentStep === 1);
-      }
-
-      if (changed.currentStep) {
-         $$invalidate("upp", upp = currentStep === 3);
-      }
-
-      if (changed.currentStep) {
-         $$invalidate("tutorialContent", tutorialContent = tutorialInstructions[currentStep]);
-      }
-    };
-
-    return {
-      src: src,
-      segments: segments,
-      rowSelected: rowSelected,
-      dispatch: dispatch,
-      peaksLoading: peaksLoading,
-      rate: rate,
-      confidence: confidence,
-      clarity: clarity,
-      clarityRated: clarityRated,
-      confidenceRated: confidenceRated,
-      time: time,
-      invalidTime: invalidTime,
-      modalOpen: modalOpen,
-      currentStep: currentStep,
-      tutorialComplete: tutorialComplete,
-      quizComplete: quizComplete,
-      quizFailed: quizFailed,
-      tutorialSubmitted: tutorialSubmitted,
-      tutorialInstructions: tutorialInstructions,
-      backward: backward,
-      forward: forward,
-      dragStart: dragStart,
-      drag: drag,
-      dragEnd: dragEnd,
-      debounce: debounce,
-      finish: finish,
-      submitTags: submitTags,
-      addSegment: addSegment,
-      selectSegment: selectSegment,
-      playSegment: playSegment,
-      deleteSegment: deleteSegment,
-      nextTrialActive: nextTrialActive,
-      ratingActive: ratingActive,
-      tutorialState: tutorialState,
-      down: down,
-      up: up,
-      right: right,
-      upp: upp,
-      tutorialContent: tutorialContent,
-      click_handler: click_handler,
-      click_handler_1: click_handler_1,
-      click_handler_2: click_handler_2,
-      click_handler_3: click_handler_3,
-      click_handler_4: click_handler_4,
-      input0_input_handler: input0_input_handler,
-      keyup_handler: keyup_handler,
-      input1_change_input_handler: input1_change_input_handler,
-      click_handler_5: click_handler_5,
-      input2_change_input_handler: input2_change_input_handler,
-      click_handler_6: click_handler_6
-    };
-  }
-
-  var Quiz =
-  /*#__PURE__*/
-  function (_SvelteComponentDev) {
-    _inherits(Quiz, _SvelteComponentDev);
-
-    function Quiz(options) {
-      var _this;
-
-      _classCallCheck(this, Quiz);
-
-      _this = _possibleConstructorReturn(this, _getPrototypeOf(Quiz).call(this, options));
-      init(_assertThisInitialized(_this), options, instance$1, create_fragment$1, safe_not_equal, {
-        src: 0
-      });
-      dispatch_dev("SvelteRegisterComponent", {
-        component: _assertThisInitialized(_this),
-        tagName: "Quiz",
-        options: options,
-        id: create_fragment$1.name
-      });
-      var ctx = _this.$$.ctx;
-      var props = options.props || {};
-
-      if (ctx.src === undefined && !("src" in props)) {
-        console_1.warn("<Quiz> was created without expected prop 'src'");
-      }
-
-      return _this;
-    }
-
-    _createClass(Quiz, [{
-      key: "src",
-      get: function get() {
-        throw new Error("<Quiz>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-      },
-      set: function set(value) {
-        throw new Error("<Quiz>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-      }
-    }]);
-
-    return Quiz;
-  }(SvelteComponentDev);
-
-  var console_1$1 = globals.console;
-  var file$2 = "src/components/TagThought.svelte";
-
-  function get_each_context$1(ctx, list, i) {
-    var child_ctx = Object.create(ctx);
-    child_ctx.segment = list[i];
-    child_ctx.i = i;
-    return child_ctx;
-  } // (201:6) {#if peaksLoading}
-
-
-  function create_if_block_4$1(ctx) {
-    var h3;
-    var t1;
-    var button;
-    var block = {
-      c: function create() {
-        h3 = element("h3");
-        h3.textContent = "Loading audio...";
-        t1 = space();
-        button = element("button");
-        attr_dev(h3, "class", "title is-3");
-        add_location(h3, file$2, 201, 8, 6697);
-        attr_dev(button, "class", "button is-white is-loading loading-button svelte-1k5bkci");
-        button.disabled = true;
-        add_location(button, file$2, 202, 8, 6750);
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, h3, anchor);
-        insert_dev(target, t1, anchor);
-        insert_dev(target, button, anchor);
-      },
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(h3);
-        if (detaching) detach_dev(t1);
-        if (detaching) detach_dev(button);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_if_block_4$1.name,
-      type: "if",
-      source: "(201:6) {#if peaksLoading}",
-      ctx: ctx
-    });
-    return block;
-  } // (222:10) {:else}
-
-
-  function create_else_block_2$1(ctx) {
-    var button0;
-    var t1;
-    var button1;
-    var t2;
-    var t3;
-    var button2;
-    var t4;
-    var button2_class_value;
-    var t5;
-    var button3;
-    var t6;
-    var button3_class_value;
-    var dispose;
-    var block = {
-      c: function create() {
-        button0 = element("button");
-        button0.textContent = "Tag Thought";
-        t1 = space();
-        button1 = element("button");
-        t2 = text("Done");
-        t3 = space();
-        button2 = element("button");
-        t4 = text("Play Thought");
-        t5 = space();
-        button3 = element("button");
-        t6 = text("Delete Segment");
-        attr_dev(button0, "class", "button is-primary is-large");
-        add_location(button0, file$2, 222, 12, 7475);
-        attr_dev(button1, "class", "button is-info is-large");
-        button1.disabled = ctx.ratingActive;
-        add_location(button1, file$2, 223, 12, 7573);
-        attr_dev(button2, "class", button2_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-success is-large" : "button is-success is-large hidden") + " svelte-1k5bkci"));
-        add_location(button2, file$2, 226, 12, 7714);
-        attr_dev(button3, "class", button3_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-danger is-large" : "button is-danger is-large hidden") + " svelte-1k5bkci"));
-        add_location(button3, file$2, 231, 12, 7924);
-        dispose = [listen_dev(button0, "click", ctx.addSegment, false, false, false), listen_dev(button1, "click", ctx.makeRatings, false, false, false), listen_dev(button2, "click", ctx.playSegment, false, false, false), listen_dev(button3, "click", ctx.deleteSegment, false, false, false)];
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, button0, anchor);
-        insert_dev(target, t1, anchor);
-        insert_dev(target, button1, anchor);
-        append_dev(button1, t2);
-        insert_dev(target, t3, anchor);
-        insert_dev(target, button2, anchor);
-        append_dev(button2, t4);
-        insert_dev(target, t5, anchor);
-        insert_dev(target, button3, anchor);
-        append_dev(button3, t6);
-      },
-      p: function update(changed, ctx) {
-        if (changed.ratingActive) {
-          prop_dev(button1, "disabled", ctx.ratingActive);
-        }
-
-        if (changed.rowSelected && button2_class_value !== (button2_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-success is-large" : "button is-success is-large hidden") + " svelte-1k5bkci"))) {
-          attr_dev(button2, "class", button2_class_value);
-        }
-
-        if (changed.rowSelected && button3_class_value !== (button3_class_value = "" + (null_to_empty(ctx.rowSelected ? "button is-danger is-large" : "button is-danger is-large hidden") + " svelte-1k5bkci"))) {
-          attr_dev(button3, "class", button3_class_value);
-        }
-      },
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(button0);
-        if (detaching) detach_dev(t1);
-        if (detaching) detach_dev(button1);
-        if (detaching) detach_dev(t3);
-        if (detaching) detach_dev(button2);
-        if (detaching) detach_dev(t5);
-        if (detaching) detach_dev(button3);
-        run_all(dispose);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_else_block_2$1.name,
-      type: "else",
-      source: "(222:10) {:else}",
-      ctx: ctx
-    });
-    return block;
-  } // (218:10) {#if rate}
-
-
-  function create_if_block_3$1(ctx) {
-    var button;
-    var t;
-    var dispose;
-    var block = {
-      c: function create() {
-        button = element("button");
-        t = text("Next Recording");
-        attr_dev(button, "class", "button is-primary is-large");
-        button.disabled = ctx.nextTrialActive;
-        add_location(button, file$2, 218, 12, 7305);
-        dispose = listen_dev(button, "click", ctx.finish, false, false, false);
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, button, anchor);
-        append_dev(button, t);
-      },
-      p: function update(changed, ctx) {
-        if (changed.nextTrialActive) {
-          prop_dev(button, "disabled", ctx.nextTrialActive);
-        }
-      },
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(button);
-        dispose();
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_if_block_3$1.name,
-      type: "if",
-      source: "(218:10) {#if rate}",
-      ctx: ctx
-    });
-    return block;
-  } // (302:2) {:else}
-
-
-  function create_else_block$2(ctx) {
-    var div1;
-    var div0;
-
-    function select_block_type_2(changed, ctx) {
-      if (ctx.segments && ctx.segments.length) return create_if_block_2$1;
-      return create_else_block_1$1;
-    }
-
-    var current_block_type = select_block_type_2(null, ctx);
-    var if_block = current_block_type(ctx);
-    var block = {
-      c: function create() {
-        div1 = element("div");
-        div0 = element("div");
-        if_block.c();
-        attr_dev(div0, "class", "column is-three-quarters has-text-centered");
-        add_location(div0, file$2, 303, 6, 10425);
-        attr_dev(div1, "class", "columns is-centered");
-        add_location(div1, file$2, 302, 4, 10385);
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, div1, anchor);
-        append_dev(div1, div0);
-        if_block.m(div0, null);
-      },
-      p: function update(changed, ctx) {
-        if (current_block_type === (current_block_type = select_block_type_2(changed, ctx)) && if_block) {
-          if_block.p(changed, ctx);
-        } else {
-          if_block.d(1);
-          if_block = current_block_type(ctx);
-
-          if (if_block) {
-            if_block.c();
-            if_block.m(div0, null);
-          }
-        }
-      },
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(div1);
-        if_block.d();
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_else_block$2.name,
-      type: "else",
-      source: "(302:2) {:else}",
-      ctx: ctx
-    });
-    return block;
-  } // (244:2) {#if rate}
-
-
-  function create_if_block$2(ctx) {
-    var div11;
-    var div2;
-    var div1;
-    var label;
-    var t1;
-    var div0;
-    var input0;
-    var input0_class_value;
-    var t2;
-    var t3;
-    var div6;
-    var p0;
-    var t5;
-    var input1;
-    var t6;
-    var div5;
-    var div3;
-    var p1;
-    var t8;
-    var div4;
-    var p2;
-    var t10;
-    var div10;
-    var p3;
-    var t12;
-    var input2;
-    var t13;
-    var div9;
-    var div7;
-    var p4;
-    var t15;
-    var div8;
-    var p5;
-    var div11_class_value;
-    var dispose;
-    var if_block = ctx.invalidTime && create_if_block_1$1(ctx);
-    var block = {
-      c: function create() {
-        div11 = element("div");
-        div2 = element("div");
-        div1 = element("div");
-        label = element("label");
-        label.textContent = "When did the speaker stop talking?";
-        t1 = space();
-        div0 = element("div");
-        input0 = element("input");
-        t2 = space();
-        if (if_block) if_block.c();
-        t3 = space();
-        div6 = element("div");
-        p0 = element("p");
-        p0.textContent = "How clear was the quality of the recording?";
-        t5 = space();
-        input1 = element("input");
-        t6 = space();
-        div5 = element("div");
-        div3 = element("div");
-        p1 = element("p");
-        p1.textContent = "Uninterpretable";
-        t8 = space();
-        div4 = element("div");
-        p2 = element("p");
-        p2.textContent = "Perfect";
-        t10 = space();
-        div10 = element("div");
-        p3 = element("p");
-        p3.textContent = "How easy was it to tag different thoughts?";
-        t12 = space();
-        input2 = element("input");
-        t13 = space();
-        div9 = element("div");
-        div7 = element("div");
-        p4 = element("p");
-        p4.textContent = "Impossible";
-        t15 = space();
-        div8 = element("div");
-        p5 = element("p");
-        p5.textContent = "Effortless";
-        attr_dev(label, "class", "label has-text-weight-normal is-size-5");
-        add_location(label, file$2, 247, 10, 8463);
-        attr_dev(input0, "class", input0_class_value = ctx.invalidTime ? "input age-input is-danger" : "input age-input");
-        attr_dev(input0, "type", "text");
-        attr_dev(input0, "placeholder", "Please enter a timestamp like MM:SS");
-        add_location(input0, file$2, 251, 12, 8628);
-        attr_dev(div0, "class", "control");
-        add_location(div0, file$2, 250, 10, 8594);
-        attr_dev(div1, "class", "field");
-        add_location(div1, file$2, 246, 8, 8433);
-        attr_dev(div2, "class", "column is-3 has-text-centered");
-        add_location(div2, file$2, 245, 6, 8381);
-        attr_dev(p0, "class", "has-text-centered is-size-5");
-        add_location(p0, file$2, 264, 8, 9136);
-        attr_dev(input1, "step", "1");
-        attr_dev(input1, "min", "0");
-        attr_dev(input1, "max", "100");
-        attr_dev(input1, "type", "range");
-        add_location(input1, file$2, 265, 8, 9231);
-        attr_dev(p1, "class", "subtitle is-size-6");
-        add_location(p1, file$2, 274, 12, 9505);
-        attr_dev(div3, "class", "column has-text-left");
-        add_location(div3, file$2, 273, 10, 9458);
-        attr_dev(p2, "class", "subtitle is-size-6");
-        add_location(p2, file$2, 277, 12, 9630);
-        attr_dev(div4, "class", "column has-text-right");
-        add_location(div4, file$2, 276, 10, 9582);
-        attr_dev(div5, "class", "columns is-centered");
-        add_location(div5, file$2, 272, 8, 9414);
-        attr_dev(div6, "class", "column is-3 has-text-centered");
-        add_location(div6, file$2, 263, 6, 9084);
-        attr_dev(p3, "class", "has-text-centered is-size-5");
-        add_location(p3, file$2, 282, 8, 9775);
-        attr_dev(input2, "step", "1");
-        attr_dev(input2, "min", "0");
-        attr_dev(input2, "max", "100");
-        attr_dev(input2, "type", "range");
-        add_location(input2, file$2, 283, 8, 9869);
-        attr_dev(p4, "class", "subtitle is-size-6");
-        add_location(p4, file$2, 292, 12, 10149);
-        attr_dev(div7, "class", "column has-text-left");
-        add_location(div7, file$2, 291, 10, 10102);
-        attr_dev(p5, "class", "subtitle is-size-6");
-        add_location(p5, file$2, 295, 12, 10269);
-        attr_dev(div8, "class", "column has-text-right");
-        add_location(div8, file$2, 294, 10, 10221);
-        attr_dev(div9, "class", "columns is-centered");
-        add_location(div9, file$2, 290, 8, 10058);
-        attr_dev(div10, "class", "column is-3 has-text-centered");
-        add_location(div10, file$2, 281, 6, 9723);
-        attr_dev(div11, "class", div11_class_value = ctx.rate ? "columns is-centered" : "columns is-centered");
-        add_location(div11, file$2, 244, 4, 8308);
-        dispose = [listen_dev(input0, "input", ctx.input0_input_handler), listen_dev(input0, "keyup", ctx.keyup_handler, false, false, false), listen_dev(input1, "change", ctx.input1_change_input_handler), listen_dev(input1, "input", ctx.input1_change_input_handler), listen_dev(input1, "click", ctx.click_handler, {
-          once: true
-        }, false, false), listen_dev(input2, "change", ctx.input2_change_input_handler), listen_dev(input2, "input", ctx.input2_change_input_handler), listen_dev(input2, "click", ctx.click_handler_1, {
-          once: true
-        }, false, false)];
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, div11, anchor);
-        append_dev(div11, div2);
-        append_dev(div2, div1);
-        append_dev(div1, label);
-        append_dev(div1, t1);
-        append_dev(div1, div0);
-        append_dev(div0, input0);
-        set_input_value(input0, ctx.time);
-        append_dev(div1, t2);
-        if (if_block) if_block.m(div1, null);
-        append_dev(div11, t3);
-        append_dev(div11, div6);
-        append_dev(div6, p0);
-        append_dev(div6, t5);
-        append_dev(div6, input1);
-        set_input_value(input1, ctx.clarity);
-        append_dev(div6, t6);
-        append_dev(div6, div5);
-        append_dev(div5, div3);
-        append_dev(div3, p1);
-        append_dev(div5, t8);
-        append_dev(div5, div4);
-        append_dev(div4, p2);
-        append_dev(div11, t10);
-        append_dev(div11, div10);
-        append_dev(div10, p3);
-        append_dev(div10, t12);
-        append_dev(div10, input2);
-        set_input_value(input2, ctx.confidence);
-        append_dev(div10, t13);
-        append_dev(div10, div9);
-        append_dev(div9, div7);
-        append_dev(div7, p4);
-        append_dev(div9, t15);
-        append_dev(div9, div8);
-        append_dev(div8, p5);
-      },
-      p: function update(changed, ctx) {
-        if (changed.invalidTime && input0_class_value !== (input0_class_value = ctx.invalidTime ? "input age-input is-danger" : "input age-input")) {
-          attr_dev(input0, "class", input0_class_value);
-        }
-
-        if (changed.time && input0.value !== ctx.time) {
-          set_input_value(input0, ctx.time);
-        }
-
-        if (ctx.invalidTime) {
-          if (!if_block) {
-            if_block = create_if_block_1$1(ctx);
-            if_block.c();
-            if_block.m(div1, null);
-          }
-        } else if (if_block) {
-          if_block.d(1);
-          if_block = null;
-        }
-
-        if (changed.clarity) {
-          set_input_value(input1, ctx.clarity);
-        }
-
-        if (changed.confidence) {
-          set_input_value(input2, ctx.confidence);
-        }
-
-        if (changed.rate && div11_class_value !== (div11_class_value = ctx.rate ? "columns is-centered" : "columns is-centered")) {
-          attr_dev(div11, "class", div11_class_value);
-        }
-      },
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(div11);
-        if (if_block) if_block.d();
-        run_all(dispose);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_if_block$2.name,
-      type: "if",
-      source: "(244:2) {#if rate}",
-      ctx: ctx
-    });
-    return block;
-  } // (326:8) {:else}
-
-
-  function create_else_block_1$1(ctx) {
-    var h2;
-    var block = {
-      c: function create() {
-        h2 = element("h2");
-        h2.textContent = "No Thoughts Tagged";
-        attr_dev(h2, "class", "title is-4");
-        add_location(h2, file$2, 326, 10, 11341);
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, h2, anchor);
-      },
-      p: noop,
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(h2);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_else_block_1$1.name,
-      type: "else",
-      source: "(326:8) {:else}",
-      ctx: ctx
-    });
-    return block;
-  } // (305:8) {#if segments && segments.length}
-
-
-  function create_if_block_2$1(ctx) {
-    var div;
-    var table;
-    var thead;
-    var tr;
-    var th0;
-    var t1;
-    var th1;
-    var t3;
-    var th2;
-    var t5;
-    var tbody;
-    var each_blocks = [];
-    var each_1_lookup = new Map();
-    var each_value = ctx.segments;
-
-    var get_key = function get_key(ctx) {
-      return ctx.segment.id;
-    };
-
-    for (var i = 0; i < each_value.length; i += 1) {
-      var child_ctx = get_each_context$1(ctx, each_value, i);
-      var key = get_key(child_ctx);
-      each_1_lookup.set(key, each_blocks[i] = create_each_block$1(key, child_ctx));
-    }
-
-    var block = {
-      c: function create() {
-        div = element("div");
-        table = element("table");
-        thead = element("thead");
-        tr = element("tr");
-        th0 = element("th");
-        th0.textContent = "Thought Number";
-        t1 = space();
-        th1 = element("th");
-        th1.textContent = "Start time";
-        t3 = space();
-        th2 = element("th");
-        th2.textContent = "End time";
-        t5 = space();
-        tbody = element("tbody");
-
-        for (var _i = 0; _i < each_blocks.length; _i += 1) {
-          each_blocks[_i].c();
-        }
-
-        add_location(th0, file$2, 309, 18, 10672);
-        add_location(th1, file$2, 310, 18, 10714);
-        add_location(th2, file$2, 311, 18, 10752);
-        add_location(tr, file$2, 308, 16, 10649);
-        add_location(thead, file$2, 307, 14, 10625);
-        add_location(tbody, file$2, 314, 14, 10829);
-        attr_dev(table, "class", "table is-hoverable svelte-1k5bkci");
-        add_location(table, file$2, 306, 12, 10576);
-        attr_dev(div, "class", "table-container");
-        add_location(div, file$2, 305, 10, 10534);
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, div, anchor);
-        append_dev(div, table);
-        append_dev(table, thead);
-        append_dev(thead, tr);
-        append_dev(tr, th0);
-        append_dev(tr, t1);
-        append_dev(tr, th1);
-        append_dev(tr, t3);
-        append_dev(tr, th2);
-        append_dev(table, t5);
-        append_dev(table, tbody);
-
-        for (var _i2 = 0; _i2 < each_blocks.length; _i2 += 1) {
-          each_blocks[_i2].m(tbody, null);
-        }
-      },
-      p: function update(changed, ctx) {
-        var each_value = ctx.segments;
-        each_blocks = update_keyed_each(each_blocks, changed, get_key, 1, ctx, each_value, each_1_lookup, tbody, destroy_block, create_each_block$1, null, get_each_context$1);
-      },
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(div);
-
-        for (var _i3 = 0; _i3 < each_blocks.length; _i3 += 1) {
-          each_blocks[_i3].d();
-        }
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_if_block_2$1.name,
-      type: "if",
-      source: "(305:8) {#if segments && segments.length}",
-      ctx: ctx
-    });
-    return block;
-  } // (316:16) {#each segments as segment, i (segment.id)}
-
-
-  function create_each_block$1(key_1, ctx) {
-    var tr;
-    var td0;
-    var t0_value = ctx.segment.id.split(".").slice(-1)[0] + "";
-    var t0;
-    var t1;
-    var td1;
-    var t2_value = ctx.segment.startTime.toFixed(2) + "";
-    var t2;
-    var t3;
-    var td2;
-    var t4_value = ctx.segment.endTime.toFixed(2) + "";
-    var t4;
-    var t5;
-    var dispose;
-    var block = {
-      key: key_1,
-      first: null,
-      c: function create() {
-        tr = element("tr");
-        td0 = element("td");
-        t0 = text(t0_value);
-        t1 = space();
-        td1 = element("td");
-        t2 = text(t2_value);
-        t3 = space();
-        td2 = element("td");
-        t4 = text(t4_value);
-        t5 = space();
-        attr_dev(td0, "type", "text");
-        attr_dev(td0, "class", "segment-id");
-        add_location(td0, file$2, 317, 20, 10983);
-        attr_dev(td1, "type", "number");
-        add_location(td1, file$2, 318, 20, 11080);
-        attr_dev(td2, "type", "number");
-        add_location(td2, file$2, 319, 20, 11154);
-        attr_dev(tr, "class", "table-row");
-        add_location(tr, file$2, 316, 18, 10915);
-        dispose = listen_dev(tr, "click", ctx.selectSegment, false, false, false);
-        this.first = tr;
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, tr, anchor);
-        append_dev(tr, td0);
-        append_dev(td0, t0);
-        append_dev(tr, t1);
-        append_dev(tr, td1);
-        append_dev(td1, t2);
-        append_dev(tr, t3);
-        append_dev(tr, td2);
-        append_dev(td2, t4);
-        append_dev(tr, t5);
-      },
-      p: function update(changed, ctx) {
-        if (changed.segments && t0_value !== (t0_value = ctx.segment.id.split(".").slice(-1)[0] + "")) set_data_dev(t0, t0_value);
-        if (changed.segments && t2_value !== (t2_value = ctx.segment.startTime.toFixed(2) + "")) set_data_dev(t2, t2_value);
-        if (changed.segments && t4_value !== (t4_value = ctx.segment.endTime.toFixed(2) + "")) set_data_dev(t4, t4_value);
-      },
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(tr);
-        dispose();
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_each_block$1.name,
-      type: "each",
-      source: "(316:16) {#each segments as segment, i (segment.id)}",
-      ctx: ctx
-    });
-    return block;
-  } // (259:10) {#if invalidTime}
-
-
-  function create_if_block_1$1(ctx) {
-    var p;
-    var block = {
-      c: function create() {
-        p = element("p");
-        p.textContent = "Invalid timestamp. Please use MM:SS format.";
-        attr_dev(p, "class", "help is-danger");
-        add_location(p, file$2, 259, 12, 8960);
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, p, anchor);
-      },
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(p);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_if_block_1$1.name,
-      type: "if",
-      source: "(259:10) {#if invalidTime}",
-      ctx: ctx
-    });
-    return block;
-  }
-
-  function create_fragment$2(ctx) {
-    var div8;
-    var div2;
-    var div1;
-    var h1;
-    var t0;
-    var t1;
-    var t2;
-    var t3;
-    var div0;
-    var t4;
-    var div7;
-    var div6;
-    var div5;
-    var div3;
-    var audio;
-    var source;
-    var source_src_value;
-    var t5;
-    var t6;
-    var div4;
-    var t7;
-    var if_block0 = ctx.peaksLoading && create_if_block_4$1(ctx);
-
-    function select_block_type(changed, ctx) {
-      if (ctx.rate) return create_if_block_3$1;
-      return create_else_block_2$1;
-    }
-
-    var current_block_type = select_block_type(null, ctx);
-    var if_block1 = current_block_type(ctx);
-
-    function select_block_type_1(changed, ctx) {
-      if (ctx.rate) return create_if_block$2;
-      return create_else_block$2;
-    }
-
-    var current_block_type_1 = select_block_type_1(null, ctx);
-    var if_block2 = current_block_type_1(ctx);
-    var block = {
-      c: function create() {
-        div8 = element("div");
-        div2 = element("div");
-        div1 = element("div");
-        h1 = element("h1");
-        t0 = text("Recording #");
-        t1 = text(ctx.currentTrial);
-        t2 = space();
-        if (if_block0) if_block0.c();
-        t3 = space();
-        div0 = element("div");
-        t4 = space();
-        div7 = element("div");
-        div6 = element("div");
-        div5 = element("div");
-        div3 = element("div");
-        audio = element("audio");
-        source = element("source");
-        t5 = text("\n            Your browser does not support the audio element.");
-        t6 = space();
-        div4 = element("div");
-        if_block1.c();
-        t7 = space();
-        if_block2.c();
-        attr_dev(h1, "class", "title");
-        add_location(h1, file$2, 199, 6, 6615);
-        attr_dev(div0, "id", "waveform-container");
-        add_location(div0, file$2, 204, 6, 6838);
-        attr_dev(div1, "class", "column is-three-quarters has-text-centered");
-        add_location(div1, file$2, 198, 4, 6552);
-        attr_dev(div2, "class", "columns is-centered");
-        add_location(div2, file$2, 197, 2, 6514);
-        if (source.src !== (source_src_value = ctx.src)) attr_dev(source, "src", source_src_value);
-        attr_dev(source, "type", "audio/wav");
-        add_location(source, file$2, 212, 12, 7102);
-        attr_dev(audio, "id", "audio");
-        audio.controls = "controls";
-        add_location(audio, file$2, 211, 10, 7051);
-        attr_dev(div3, "class", "column is-one-quarter");
-        add_location(div3, file$2, 210, 8, 7005);
-        attr_dev(div4, "class", "column is-one-half");
-        add_location(div4, file$2, 216, 8, 7239);
-        attr_dev(div5, "class", "columns");
-        add_location(div5, file$2, 209, 6, 6975);
-        attr_dev(div6, "class", "column is-three-quarters");
-        add_location(div6, file$2, 208, 4, 6930);
-        attr_dev(div7, "class", "columns is-centered");
-        add_location(div7, file$2, 207, 2, 6892);
-        attr_dev(div8, "class", "container is-fluid");
-        add_location(div8, file$2, 196, 0, 6479);
-      },
-      l: function claim(nodes) {
-        throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, div8, anchor);
-        append_dev(div8, div2);
-        append_dev(div2, div1);
-        append_dev(div1, h1);
-        append_dev(h1, t0);
-        append_dev(h1, t1);
-        append_dev(div1, t2);
-        if (if_block0) if_block0.m(div1, null);
-        append_dev(div1, t3);
-        append_dev(div1, div0);
-        append_dev(div8, t4);
-        append_dev(div8, div7);
-        append_dev(div7, div6);
-        append_dev(div6, div5);
-        append_dev(div5, div3);
-        append_dev(div3, audio);
-        append_dev(audio, source);
-        append_dev(audio, t5);
-        append_dev(div5, t6);
-        append_dev(div5, div4);
-        if_block1.m(div4, null);
-        append_dev(div8, t7);
-        if_block2.m(div8, null);
-      },
-      p: function update(changed, ctx) {
-        if (changed.currentTrial) set_data_dev(t1, ctx.currentTrial);
-
-        if (ctx.peaksLoading) {
-          if (!if_block0) {
-            if_block0 = create_if_block_4$1(ctx);
-            if_block0.c();
-            if_block0.m(div1, t3);
-          }
-        } else if (if_block0) {
-          if_block0.d(1);
-          if_block0 = null;
-        }
-
-        if (changed.src && source.src !== (source_src_value = ctx.src)) {
-          attr_dev(source, "src", source_src_value);
-        }
-
-        if (current_block_type === (current_block_type = select_block_type(changed, ctx)) && if_block1) {
-          if_block1.p(changed, ctx);
-        } else {
-          if_block1.d(1);
-          if_block1 = current_block_type(ctx);
-
-          if (if_block1) {
-            if_block1.c();
-            if_block1.m(div4, null);
-          }
-        }
-
-        if (current_block_type_1 === (current_block_type_1 = select_block_type_1(changed, ctx)) && if_block2) {
-          if_block2.p(changed, ctx);
-        } else {
-          if_block2.d(1);
-          if_block2 = current_block_type_1(ctx);
-
-          if (if_block2) {
-            if_block2.c();
-            if_block2.m(div8, null);
-          }
-        }
-      },
-      i: noop,
-      o: noop,
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(div8);
-        if (if_block0) if_block0.d();
-        if_block1.d();
-        if_block2.d();
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_fragment$2.name,
-      type: "component",
-      source: "",
-      ctx: ctx
-    });
-    return block;
-  }
-
-  function instance$2($$self, $$props, $$invalidate) {
-    var src = $$props.src;
-    var currentTrial = $$props.currentTrial;
-    var fileName = $$props.fileName;
-
-    var _fileName$split = fileName.split("_"),
-        _fileName$split2 = _slicedToArray(_fileName$split, 2),
-        subjectId = _fileName$split2[0],
-        character = _fileName$split2[1];
-
-    var _character$split = character.split("_");
-
-    var _character$split2 = _slicedToArray(_character$split, 1);
-
-    character = _character$split2[0];
+    var quizAttempts = 0;
+    var quizPassed = false;
     var peaksInstance;
     var segments = [];
     var selectedSegmentId;
@@ -46306,14 +44704,41 @@ var app = (function () {
       });
     });
 
-    var finish = function finish() {
-      var _doc;
+    var communicateData = function communicateData(evName) {
+      if (hasTutorial) {
+        if (evName === "updateSegmentsCount") {
+          dispatch("updateSegmentsCount", {
+            numSegments: segments.length,
+            moveForward: tutorialStep === 2
+          });
+        } else if (evName === "quizAttempt") {
+          dispatch("quizAttempt", {
+            quizAttempts: quizAttempts,
+            quizPassed: quizPassed
+          });
+        } else if (evName === "finished") {
+          dispatch("readyForExperiment");
+        }
+      }
+    };
 
-      var toSave, doc;
+    var finish = function finish() {
+      var _doc, toSave, doc;
+
       return regeneratorRuntime.async(function finish$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
+              if (!hasTutorial) {
+                _context.next = 4;
+                break;
+              }
+
+              communicateData("finished");
+              _context.next = 19;
+              break;
+
+            case 4:
               toSave = {};
               console.log(segments);
               segments.forEach(function (obj) {
@@ -46331,33 +44756,93 @@ var app = (function () {
                 thoughts: toSave,
                 submitTime: serverTime
               }), _defineProperty(_doc, "currentTrial", currentTrial + 1), _doc);
-              _context.prev = 4;
-              _context.next = 7;
+              _context.prev = 8;
+              _context.next = 11;
               return regeneratorRuntime.awrap(db.ref("participants/".concat(params.workerId)).update(doc));
 
-            case 7:
+            case 11:
               console.log("document added successfully");
               peaksInstance.destroy();
               dispatch("next");
-              _context.next = 15;
+              _context.next = 19;
               break;
 
-            case 12:
-              _context.prev = 12;
-              _context.t0 = _context["catch"](4);
+            case 16:
+              _context.prev = 16;
+              _context.t0 = _context["catch"](8);
               console.error(_context.t0);
 
-            case 15:
+            case 19:
             case "end":
               return _context.stop();
           }
         }
-      }, null, null, [[4, 12]]);
+      }, null, null, [[8, 16]]);
     };
 
-    var makeRatings = function makeRatings() {
+    var verifyTags = function verifyTags() {
+      var nearestValue = function nearestValue(arr, val) {
+        return arr.reduce(function (p, n) {
+          return Math.abs(p) > Math.abs(n - val) ? n - val : p;
+        }, Infinity) + val;
+      };
+
+      var check = [];
+      var match;
+      var correctStartTimes = quizAnswers.map(function (obj) {
+        return obj.startTime;
+      });
+      var correctEndTimes = quizAnswers.map(function (obj) {
+        return obj.endTime;
+      });
+      var _iteratorNormalCompletion = true;
+      var _didIteratorError = false;
+      var _iteratorError = undefined;
+
+      try {
+        for (var _iterator = segments.entries()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+          var _step$value = _slicedToArray(_step.value, 2),
+              i = _step$value[0],
+              obj = _step$value[1];
+
+          match = nearestValue(correctStartTimes, obj.startTime) === correctStartTimes[i] && nearestValue(correctEndTimes, obj.endTime) === correctEndTimes[i];
+          check.push(match);
+        }
+      } catch (err) {
+        _didIteratorError = true;
+        _iteratorError = err;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && _iterator.return != null) {
+            _iterator.return();
+          }
+        } finally {
+          if (_didIteratorError) {
+            throw _iteratorError;
+          }
+        }
+      }
+
+      var allCorrect = check.every(function (e) {
+        return e;
+      });
+      quizAttempts += 1;
+
+      if (allCorrect) {
+        quizPassed = true;
+      }
+
+      console.log("Quiz passed: ".concat(quizPassed));
+      console.log("Quiz attempts: ".concat(quizAttempts));
+    };
+
+    var submitTags = function submitTags() {
       if (!segments || segments && segments.length <= 2) {
         alert("Please tag a few more thoughts");
+      } else if (hasTutorial) {
+        verifyTags();
+        communicateData("quizAttempt");
+        $$invalidate("rate", rate = quizPassed);
       } else {
         $$invalidate("rate", rate = !rate);
       }
@@ -46372,6 +44857,7 @@ var app = (function () {
       });
       $$invalidate("segments", segments = peaksInstance.segments.getSegments());
       segmentPrevMax += 1;
+      communicateData("updateSegmentsCount");
     }
 
     function selectSegment(ev) {
@@ -46379,40 +44865,14 @@ var app = (function () {
       var row = ev.target.parentNode;
 
       if (row.className === "table-row is-selected") {
-        var _iteratorNormalCompletion = true;
-        var _didIteratorError = false;
-        var _iteratorError = undefined;
-
-        try {
-          for (var _iterator = rows[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-            var r = _step.value;
-            r.className = "table-row";
-          }
-        } catch (err) {
-          _didIteratorError = true;
-          _iteratorError = err;
-        } finally {
-          try {
-            if (!_iteratorNormalCompletion && _iterator.return != null) {
-              _iterator.return();
-            }
-          } finally {
-            if (_didIteratorError) {
-              throw _iteratorError;
-            }
-          }
-        }
-
-        $$invalidate("rowSelected", rowSelected = false);
-      } else {
         var _iteratorNormalCompletion2 = true;
         var _didIteratorError2 = false;
         var _iteratorError2 = undefined;
 
         try {
           for (var _iterator2 = rows[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
-            var _r = _step2.value;
-            _r.className = "table-row";
+            var r = _step2.value;
+            r.className = "table-row";
           }
         } catch (err) {
           _didIteratorError2 = true;
@@ -46425,6 +44885,32 @@ var app = (function () {
           } finally {
             if (_didIteratorError2) {
               throw _iteratorError2;
+            }
+          }
+        }
+
+        $$invalidate("rowSelected", rowSelected = false);
+      } else {
+        var _iteratorNormalCompletion3 = true;
+        var _didIteratorError3 = false;
+        var _iteratorError3 = undefined;
+
+        try {
+          for (var _iterator3 = rows[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+            var _r = _step3.value;
+            _r.className = "table-row";
+          }
+        } catch (err) {
+          _didIteratorError3 = true;
+          _iteratorError3 = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion3 && _iterator3.return != null) {
+              _iterator3.return();
+            }
+          } finally {
+            if (_didIteratorError3) {
+              throw _iteratorError3;
             }
           }
         }
@@ -46445,38 +44931,43 @@ var app = (function () {
     function deleteSegment() {
       peaksInstance.segments.removeById(selectedSegmentId);
       var rows = document.getElementsByClassName("table-row");
-      var _iteratorNormalCompletion3 = true;
-      var _didIteratorError3 = false;
-      var _iteratorError3 = undefined;
+      var _iteratorNormalCompletion4 = true;
+      var _didIteratorError4 = false;
+      var _iteratorError4 = undefined;
 
       try {
-        for (var _iterator3 = rows[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
-          var r = _step3.value;
+        for (var _iterator4 = rows[Symbol.iterator](), _step4; !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
+          var r = _step4.value;
           r.className = "table-row";
         }
       } catch (err) {
-        _didIteratorError3 = true;
-        _iteratorError3 = err;
+        _didIteratorError4 = true;
+        _iteratorError4 = err;
       } finally {
         try {
-          if (!_iteratorNormalCompletion3 && _iterator3.return != null) {
-            _iterator3.return();
+          if (!_iteratorNormalCompletion4 && _iterator4.return != null) {
+            _iterator4.return();
           }
         } finally {
-          if (_didIteratorError3) {
-            throw _iteratorError3;
+          if (_didIteratorError4) {
+            throw _iteratorError4;
           }
         }
       }
 
       $$invalidate("rowSelected", rowSelected = false);
       $$invalidate("segments", segments = peaksInstance.segments.getSegments());
+      communicateData("updateSegmentsCount");
     }
 
-    var writable_props = ["src", "currentTrial", "fileName"];
+    var writable_props = ["src", "currentTrial", "fileName", "tutorialStep", "hasTutorial", "quizAnswers", "quizState"];
     Object.keys($$props).forEach(function (key) {
-      if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1$1.warn("<TagThought> was created with unknown prop '".concat(key, "'"));
+      if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1.warn("<ThoughtTagger> was created with unknown prop '".concat(key, "'"));
     });
+
+    var click_handler = function click_handler() {
+      return dispatch("toggleTutorial");
+    };
 
     function input0_input_handler() {
       time = this.value;
@@ -46492,7 +44983,7 @@ var app = (function () {
       $$invalidate("clarity", clarity);
     }
 
-    var click_handler = function click_handler() {
+    var click_handler_1 = function click_handler_1() {
       return $$invalidate("clarityRated", clarityRated = true);
     };
 
@@ -46501,7 +44992,7 @@ var app = (function () {
       $$invalidate("confidence", confidence);
     }
 
-    var click_handler_1 = function click_handler_1() {
+    var click_handler_2 = function click_handler_2() {
       return $$invalidate("confidenceRated", confidenceRated = true);
     };
 
@@ -46509,6 +45000,10 @@ var app = (function () {
       if ("src" in $$props) $$invalidate("src", src = $$props.src);
       if ("currentTrial" in $$props) $$invalidate("currentTrial", currentTrial = $$props.currentTrial);
       if ("fileName" in $$props) $$invalidate("fileName", fileName = $$props.fileName);
+      if ("tutorialStep" in $$props) $$invalidate("tutorialStep", tutorialStep = $$props.tutorialStep);
+      if ("hasTutorial" in $$props) $$invalidate("hasTutorial", hasTutorial = $$props.hasTutorial);
+      if ("quizAnswers" in $$props) $$invalidate("quizAnswers", quizAnswers = $$props.quizAnswers);
+      if ("quizState" in $$props) $$invalidate("quizState", quizState = $$props.quizState);
     };
 
     $$self.$capture_state = function () {
@@ -46516,8 +45011,14 @@ var app = (function () {
         src: src,
         currentTrial: currentTrial,
         fileName: fileName,
+        tutorialStep: tutorialStep,
+        hasTutorial: hasTutorial,
+        quizAnswers: quizAnswers,
+        quizState: quizState,
         subjectId: subjectId,
         character: character,
+        quizAttempts: quizAttempts,
+        quizPassed: quizPassed,
         peaksInstance: peaksInstance,
         segments: segments,
         selectedSegmentId: selectedSegmentId,
@@ -46541,8 +45042,14 @@ var app = (function () {
       if ("src" in $$props) $$invalidate("src", src = $$props.src);
       if ("currentTrial" in $$props) $$invalidate("currentTrial", currentTrial = $$props.currentTrial);
       if ("fileName" in $$props) $$invalidate("fileName", fileName = $$props.fileName);
+      if ("tutorialStep" in $$props) $$invalidate("tutorialStep", tutorialStep = $$props.tutorialStep);
+      if ("hasTutorial" in $$props) $$invalidate("hasTutorial", hasTutorial = $$props.hasTutorial);
+      if ("quizAnswers" in $$props) $$invalidate("quizAnswers", quizAnswers = $$props.quizAnswers);
+      if ("quizState" in $$props) $$invalidate("quizState", quizState = $$props.quizState);
       if ("subjectId" in $$props) subjectId = $$props.subjectId;
       if ("character" in $$props) character = $$props.character;
+      if ("quizAttempts" in $$props) quizAttempts = $$props.quizAttempts;
+      if ("quizPassed" in $$props) quizPassed = $$props.quizPassed;
       if ("peaksInstance" in $$props) peaksInstance = $$props.peaksInstance;
       if ("segments" in $$props) $$invalidate("segments", segments = $$props.segments);
       if ("selectedSegmentId" in $$props) selectedSegmentId = $$props.selectedSegmentId;
@@ -46586,8 +45093,13 @@ var app = (function () {
       src: src,
       currentTrial: currentTrial,
       fileName: fileName,
+      tutorialStep: tutorialStep,
+      hasTutorial: hasTutorial,
+      quizAnswers: quizAnswers,
+      quizState: quizState,
       segments: segments,
       rowSelected: rowSelected,
+      dispatch: dispatch,
       peaksLoading: peaksLoading,
       rate: rate,
       confidence: confidence,
@@ -46598,89 +45110,823 @@ var app = (function () {
       invalidTime: invalidTime,
       debounce: debounce,
       finish: finish,
-      makeRatings: makeRatings,
+      submitTags: submitTags,
       addSegment: addSegment,
       selectSegment: selectSegment,
       playSegment: playSegment,
       deleteSegment: deleteSegment,
       nextTrialActive: nextTrialActive,
       ratingActive: ratingActive,
+      click_handler: click_handler,
       input0_input_handler: input0_input_handler,
       keyup_handler: keyup_handler,
       input1_change_input_handler: input1_change_input_handler,
-      click_handler: click_handler,
+      click_handler_1: click_handler_1,
       input2_change_input_handler: input2_change_input_handler,
-      click_handler_1: click_handler_1
+      click_handler_2: click_handler_2
     };
   }
 
-  var TagThought =
+  var ThoughtTagger =
   /*#__PURE__*/
   function (_SvelteComponentDev) {
-    _inherits(TagThought, _SvelteComponentDev);
+    _inherits(ThoughtTagger, _SvelteComponentDev);
 
-    function TagThought(options) {
+    function ThoughtTagger(options) {
       var _this;
 
-      _classCallCheck(this, TagThought);
+      _classCallCheck(this, ThoughtTagger);
 
-      _this = _possibleConstructorReturn(this, _getPrototypeOf(TagThought).call(this, options));
-      init(_assertThisInitialized(_this), options, instance$2, create_fragment$2, safe_not_equal, {
+      _this = _possibleConstructorReturn(this, _getPrototypeOf(ThoughtTagger).call(this, options));
+      init(_assertThisInitialized(_this), options, instance$1, create_fragment$1, safe_not_equal, {
         src: 0,
         currentTrial: 0,
-        fileName: 0
+        fileName: 0,
+        tutorialStep: 0,
+        hasTutorial: 0,
+        quizAnswers: 0,
+        quizState: 0
       });
       dispatch_dev("SvelteRegisterComponent", {
         component: _assertThisInitialized(_this),
-        tagName: "TagThought",
+        tagName: "ThoughtTagger",
+        options: options,
+        id: create_fragment$1.name
+      });
+      var ctx = _this.$$.ctx;
+      var props = options.props || {};
+
+      if (ctx.src === undefined && !("src" in props)) {
+        console_1.warn("<ThoughtTagger> was created without expected prop 'src'");
+      }
+
+      return _this;
+    }
+
+    _createClass(ThoughtTagger, [{
+      key: "src",
+      get: function get() {
+        throw new Error("<ThoughtTagger>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<ThoughtTagger>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "currentTrial",
+      get: function get() {
+        throw new Error("<ThoughtTagger>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<ThoughtTagger>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "fileName",
+      get: function get() {
+        throw new Error("<ThoughtTagger>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<ThoughtTagger>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "tutorialStep",
+      get: function get() {
+        throw new Error("<ThoughtTagger>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<ThoughtTagger>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "hasTutorial",
+      get: function get() {
+        throw new Error("<ThoughtTagger>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<ThoughtTagger>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "quizAnswers",
+      get: function get() {
+        throw new Error("<ThoughtTagger>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<ThoughtTagger>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "quizState",
+      get: function get() {
+        throw new Error("<ThoughtTagger>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<ThoughtTagger>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }]);
+
+    return ThoughtTagger;
+  }(SvelteComponentDev);
+
+  var file$2 = "src/components/Tutorial.svelte"; // (159:37) 
+
+  function create_if_block_4$1(ctx) {
+    var p;
+    var button;
+    var dispose;
+    var block = {
+      c: function create() {
+        p = element("p");
+        button = element("button");
+        button.textContent = "Submit HIT";
+        attr_dev(button, "class", "button is-success is-large");
+        add_location(button, file$2, 160, 10, 4635);
+        attr_dev(p, "class", "card-footer-item");
+        add_location(p, file$2, 159, 8, 4596);
+        dispose = listen_dev(button, "click", ctx.click_handler_3, false, false, false);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, p, anchor);
+        append_dev(p, button);
+      },
+      p: noop,
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(p);
+        dispose();
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block_4$1.name,
+      type: "if",
+      source: "(159:37) ",
+      ctx: ctx
+    });
+    return block;
+  } // (148:51) 
+
+
+  function create_if_block_3$1(ctx) {
+    var p0;
+    var button0;
+    var t1;
+    var p1;
+    var button1;
+    var dispose;
+    var block = {
+      c: function create() {
+        p0 = element("p");
+        button0 = element("button");
+        button0.textContent = "Skip bonus work";
+        t1 = space();
+        p1 = element("p");
+        button1 = element("button");
+        button1.textContent = "Do bonus work";
+        attr_dev(button0, "class", "button is-warning is-large");
+        add_location(button0, file$2, 149, 10, 4203);
+        attr_dev(p0, "class", "card-footer-item");
+        add_location(p0, file$2, 148, 8, 4164);
+        attr_dev(button1, "class", "button is-success is-large");
+        add_location(button1, file$2, 154, 10, 4401);
+        attr_dev(p1, "class", "card-footer-item");
+        add_location(p1, file$2, 153, 8, 4362);
+        dispose = [listen_dev(button0, "click", ctx.click_handler_1, false, false, false), listen_dev(button1, "click", ctx.click_handler_2, false, false, false)];
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, p0, anchor);
+        append_dev(p0, button0);
+        insert_dev(target, t1, anchor);
+        insert_dev(target, p1, anchor);
+        append_dev(p1, button1);
+      },
+      p: noop,
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(p0);
+        if (detaching) detach_dev(t1);
+        if (detaching) detach_dev(p1);
+        run_all(dispose);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block_3$1.name,
+      type: "if",
+      source: "(148:51) ",
+      ctx: ctx
+    });
+    return block;
+  } // (123:6) {#if !tutorialComplete}
+
+
+  function create_if_block$2(ctx) {
+    var p0;
+    var button;
+    var span;
+    var i;
+    var t;
+    var p1;
+    var dispose;
+
+    function select_block_type_1(changed, ctx) {
+      if (ctx.tutorialStep === ctx.tutorial.length - 1) return create_if_block_1$1;
+      if (ctx.tutorialStep !== 2 || ctx.numSegments > 0) return create_if_block_2$1;
+    }
+
+    var current_block_type = select_block_type_1(null, ctx);
+    var if_block = current_block_type && current_block_type(ctx);
+    var block = {
+      c: function create() {
+        p0 = element("p");
+        button = element("button");
+        span = element("span");
+        i = element("i");
+        t = space();
+        p1 = element("p");
+        if (if_block) if_block.c();
+        attr_dev(i, "class", "fas fa-backward");
+        add_location(i, file$2, 126, 14, 3451);
+        attr_dev(span, "class", "icon");
+        add_location(span, file$2, 125, 12, 3417);
+        attr_dev(button, "class", "button is-link controls svelte-1q3lzhq");
+        add_location(button, file$2, 124, 10, 3344);
+        attr_dev(p0, "class", "card-footer-item");
+        add_location(p0, file$2, 123, 8, 3305);
+        attr_dev(p1, "class", "card-footer-item");
+        add_location(p1, file$2, 130, 8, 3542);
+        dispose = listen_dev(button, "click", ctx.backward, false, false, false);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, p0, anchor);
+        append_dev(p0, button);
+        append_dev(button, span);
+        append_dev(span, i);
+        insert_dev(target, t, anchor);
+        insert_dev(target, p1, anchor);
+        if (if_block) if_block.m(p1, null);
+      },
+      p: function update(changed, ctx) {
+        if (current_block_type === (current_block_type = select_block_type_1(changed, ctx)) && if_block) {
+          if_block.p(changed, ctx);
+        } else {
+          if (if_block) if_block.d(1);
+          if_block = current_block_type && current_block_type(ctx);
+
+          if (if_block) {
+            if_block.c();
+            if_block.m(p1, null);
+          }
+        }
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(p0);
+        if (detaching) detach_dev(t);
+        if (detaching) detach_dev(p1);
+
+        if (if_block) {
+          if_block.d();
+        }
+
+        dispose();
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block$2.name,
+      type: "if",
+      source: "(123:6) {#if !tutorialComplete}",
+      ctx: ctx
+    });
+    return block;
+  } // (140:58) 
+
+
+  function create_if_block_2$1(ctx) {
+    var button;
+    var span;
+    var i;
+    var dispose;
+    var block = {
+      c: function create() {
+        button = element("button");
+        span = element("span");
+        i = element("i");
+        attr_dev(i, "class", "fas fa-forward");
+        add_location(i, file$2, 142, 16, 4002);
+        attr_dev(span, "class", "icon");
+        add_location(span, file$2, 141, 14, 3966);
+        attr_dev(button, "class", "button is-link controls svelte-1q3lzhq");
+        add_location(button, file$2, 140, 12, 3892);
+        dispose = listen_dev(button, "click", ctx.forward, false, false, false);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, button, anchor);
+        append_dev(button, span);
+        append_dev(span, i);
+      },
+      p: noop,
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(button);
+        dispose();
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block_2$1.name,
+      type: "if",
+      source: "(140:58) ",
+      ctx: ctx
+    });
+    return block;
+  } // (132:10) {#if tutorialStep === tutorial.length - 1}
+
+
+  function create_if_block_1$1(ctx) {
+    var button;
+    var dispose;
+    var block = {
+      c: function create() {
+        button = element("button");
+        button.textContent = "Hide Help";
+        attr_dev(button, "class", "button is-link");
+        add_location(button, file$2, 132, 12, 3636);
+        dispose = listen_dev(button, "click", ctx.click_handler, false, false, false);
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, button, anchor);
+      },
+      p: noop,
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(button);
+        dispose();
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_if_block_1$1.name,
+      type: "if",
+      source: "(132:10) {#if tutorialStep === tutorial.length - 1}",
+      ctx: ctx
+    });
+    return block;
+  }
+
+  function create_fragment$2(ctx) {
+    var div1;
+    var div0;
+    var header;
+    var p;
+    var t0;
+    var t1;
+    var section;
+    var t2;
+    var footer;
+    var div1_class_value;
+    var dispose;
+
+    function select_block_type(changed, ctx) {
+      if (!ctx.tutorialComplete) return create_if_block$2;
+      if (ctx.quizState === "readyForExperiment") return create_if_block_3$1;
+      if (ctx.quizState === "fail") return create_if_block_4$1;
+    }
+
+    var current_block_type = select_block_type(null, ctx);
+    var if_block = current_block_type && current_block_type(ctx);
+    var block = {
+      c: function create() {
+        div1 = element("div");
+        div0 = element("div");
+        header = element("header");
+        p = element("p");
+        t0 = text(ctx.modalTitle);
+        t1 = space();
+        section = element("section");
+        t2 = space();
+        footer = element("footer");
+        if (if_block) if_block.c();
+        attr_dev(p, "class", "modal-card-title");
+        add_location(p, file$2, 116, 6, 3091);
+        attr_dev(header, "class", "modal-card-head");
+        add_location(header, file$2, 115, 4, 3052);
+        attr_dev(section, "class", "modal-card-body");
+        add_location(section, file$2, 118, 4, 3154);
+        attr_dev(footer, "class", "modal-card-foot");
+        add_location(footer, file$2, 121, 4, 3234);
+        attr_dev(div0, "class", "modal-card svelte-1q3lzhq");
+        attr_dev(div0, "id", "modal");
+        toggle_class(div0, "up", ctx.up);
+        toggle_class(div0, "right", ctx.right);
+        toggle_class(div0, "down", ctx.down);
+        toggle_class(div0, "upp", ctx.upp);
+        add_location(div0, file$2, 114, 2, 2970);
+        attr_dev(div1, "class", div1_class_value = "" + (null_to_empty(ctx.modalOpen ? "modal is-active" : "modal") + " svelte-1q3lzhq"));
+        add_location(div1, file$2, 109, 0, 2795);
+        dispose = [listen_dev(div1, "mousedown", prevent_default(ctx.dragStart), false, false, true), listen_dev(div1, "mouseup", prevent_default(ctx.dragEnd), false, false, true), listen_dev(div1, "mousemove", prevent_default(ctx.drag), false, false, true)];
+      },
+      l: function claim(nodes) {
+        throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, div1, anchor);
+        append_dev(div1, div0);
+        append_dev(div0, header);
+        append_dev(header, p);
+        append_dev(p, t0);
+        append_dev(div0, t1);
+        append_dev(div0, section);
+        section.innerHTML = ctx.modalContent;
+        append_dev(div0, t2);
+        append_dev(div0, footer);
+        if (if_block) if_block.m(footer, null);
+      },
+      p: function update(changed, ctx) {
+        if (changed.modalTitle) set_data_dev(t0, ctx.modalTitle);
+        if (changed.modalContent) section.innerHTML = ctx.modalContent;
+
+        if (current_block_type === (current_block_type = select_block_type(changed, ctx)) && if_block) {
+          if_block.p(changed, ctx);
+        } else {
+          if (if_block) if_block.d(1);
+          if_block = current_block_type && current_block_type(ctx);
+
+          if (if_block) {
+            if_block.c();
+            if_block.m(footer, null);
+          }
+        }
+
+        if (changed.up) {
+          toggle_class(div0, "up", ctx.up);
+        }
+
+        if (changed.right) {
+          toggle_class(div0, "right", ctx.right);
+        }
+
+        if (changed.down) {
+          toggle_class(div0, "down", ctx.down);
+        }
+
+        if (changed.upp) {
+          toggle_class(div0, "upp", ctx.upp);
+        }
+
+        if (changed.modalOpen && div1_class_value !== (div1_class_value = "" + (null_to_empty(ctx.modalOpen ? "modal is-active" : "modal") + " svelte-1q3lzhq"))) {
+          attr_dev(div1, "class", div1_class_value);
+        }
+      },
+      i: noop,
+      o: noop,
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(div1);
+
+        if (if_block) {
+          if_block.d();
+        }
+
+        run_all(dispose);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_fragment$2.name,
+      type: "component",
+      source: "",
+      ctx: ctx
+    });
+    return block;
+  }
+
+  function instance$2($$self, $$props, $$invalidate) {
+    var modalOpen = $$props.modalOpen;
+    var tutorial = $$props.tutorial;
+    var _$$props$tutorialStep = $$props.tutorialStep,
+        tutorialStep = _$$props$tutorialStep === void 0 ? 0 : _$$props$tutorialStep;
+    var tutorialComplete = $$props.tutorialComplete;
+    var quiz = $$props.quiz;
+    var numSegments = $$props.numSegments;
+    var quizState = $$props.quizState;
+    var modalTitle;
+    var modalContent;
+    var q;
+    var modalXInitial;
+    var modalYInitial;
+    var modalXCurrent;
+    var modalYCurrent;
+    var modalXOffset = 0;
+    var modalYOffset = 0;
+    var dragActive = false;
+    var dispatch = createEventDispatcher();
+
+    var backward = function backward() {
+      $$invalidate("tutorialStep", tutorialStep -= 1);
+      $$invalidate("tutorialStep", tutorialStep = Math.max(tutorialStep, 0));
+      dispatch("stateChange", {
+        tutorialStep: tutorialStep
+      });
+    };
+
+    var forward = function forward() {
+      $$invalidate("tutorialStep", tutorialStep = Math.min(tutorialStep + 1, tutorial.length - 1));
+      dispatch("stateChange", {
+        tutorialStep: tutorialStep
+      });
+    };
+
+    var setTranslate = function setTranslate(xPos, yPos, el) {
+      el.style.transform = "translate3d(".concat(xPos, "px, ").concat(yPos, "px, 0)");
+    };
+
+    var dragStart = function dragStart(ev) {
+      if (ev.target.parentElement.closest(".modal")) {
+        modalXInitial = ev.clientX - modalXOffset;
+        modalYInitial = ev.clientY - modalYOffset;
+        dragActive = true;
+      }
+    };
+
+    var drag = function drag(ev) {
+      if (dragActive) {
+        modalXCurrent = ev.clientX - modalXInitial;
+        modalYCurrent = ev.clientY - modalYInitial;
+        modalXOffset = modalXCurrent;
+        modalYOffset = modalYCurrent;
+        var el = document.getElementById("modal");
+        setTranslate(modalXCurrent, modalYCurrent, el);
+      }
+    };
+
+    var dragEnd = function dragEnd(ev) {
+      modalXInitial = modalXCurrent;
+      modalYInitial = modalYCurrent;
+      dragActive = false;
+    };
+
+    var writable_props = ["modalOpen", "tutorial", "tutorialStep", "tutorialComplete", "quiz", "numSegments", "quizState"];
+    Object.keys($$props).forEach(function (key) {
+      if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn("<Tutorial> was created with unknown prop '".concat(key, "'"));
+    });
+
+    var click_handler = function click_handler() {
+      dispatch("toggleTutorial");
+    };
+
+    var click_handler_1 = function click_handler_1() {
+      return dispatch("finishedComplete");
+    };
+
+    var click_handler_2 = function click_handler_2() {
+      return dispatch("finishedContinue");
+    };
+
+    var click_handler_3 = function click_handler_3() {
+      return dispatch("finishedComplete");
+    };
+
+    $$self.$set = function ($$props) {
+      if ("modalOpen" in $$props) $$invalidate("modalOpen", modalOpen = $$props.modalOpen);
+      if ("tutorial" in $$props) $$invalidate("tutorial", tutorial = $$props.tutorial);
+      if ("tutorialStep" in $$props) $$invalidate("tutorialStep", tutorialStep = $$props.tutorialStep);
+      if ("tutorialComplete" in $$props) $$invalidate("tutorialComplete", tutorialComplete = $$props.tutorialComplete);
+      if ("quiz" in $$props) $$invalidate("quiz", quiz = $$props.quiz);
+      if ("numSegments" in $$props) $$invalidate("numSegments", numSegments = $$props.numSegments);
+      if ("quizState" in $$props) $$invalidate("quizState", quizState = $$props.quizState);
+    };
+
+    $$self.$capture_state = function () {
+      return {
+        modalOpen: modalOpen,
+        tutorial: tutorial,
+        tutorialStep: tutorialStep,
+        tutorialComplete: tutorialComplete,
+        quiz: quiz,
+        numSegments: numSegments,
+        quizState: quizState,
+        modalTitle: modalTitle,
+        modalContent: modalContent,
+        q: q,
+        modalXInitial: modalXInitial,
+        modalYInitial: modalYInitial,
+        modalXCurrent: modalXCurrent,
+        modalYCurrent: modalYCurrent,
+        modalXOffset: modalXOffset,
+        modalYOffset: modalYOffset,
+        dragActive: dragActive,
+        down: down,
+        up: up,
+        right: right,
+        upp: upp
+      };
+    };
+
+    $$self.$inject_state = function ($$props) {
+      if ("modalOpen" in $$props) $$invalidate("modalOpen", modalOpen = $$props.modalOpen);
+      if ("tutorial" in $$props) $$invalidate("tutorial", tutorial = $$props.tutorial);
+      if ("tutorialStep" in $$props) $$invalidate("tutorialStep", tutorialStep = $$props.tutorialStep);
+      if ("tutorialComplete" in $$props) $$invalidate("tutorialComplete", tutorialComplete = $$props.tutorialComplete);
+      if ("quiz" in $$props) $$invalidate("quiz", quiz = $$props.quiz);
+      if ("numSegments" in $$props) $$invalidate("numSegments", numSegments = $$props.numSegments);
+      if ("quizState" in $$props) $$invalidate("quizState", quizState = $$props.quizState);
+      if ("modalTitle" in $$props) $$invalidate("modalTitle", modalTitle = $$props.modalTitle);
+      if ("modalContent" in $$props) $$invalidate("modalContent", modalContent = $$props.modalContent);
+      if ("q" in $$props) $$invalidate("q", q = $$props.q);
+      if ("modalXInitial" in $$props) modalXInitial = $$props.modalXInitial;
+      if ("modalYInitial" in $$props) modalYInitial = $$props.modalYInitial;
+      if ("modalXCurrent" in $$props) modalXCurrent = $$props.modalXCurrent;
+      if ("modalYCurrent" in $$props) modalYCurrent = $$props.modalYCurrent;
+      if ("modalXOffset" in $$props) modalXOffset = $$props.modalXOffset;
+      if ("modalYOffset" in $$props) modalYOffset = $$props.modalYOffset;
+      if ("dragActive" in $$props) dragActive = $$props.dragActive;
+      if ("down" in $$props) $$invalidate("down", down = $$props.down);
+      if ("up" in $$props) $$invalidate("up", up = $$props.up);
+      if ("right" in $$props) $$invalidate("right", right = $$props.right);
+      if ("upp" in $$props) $$invalidate("upp", upp = $$props.upp);
+    };
+
+    var down;
+    var up;
+    var right;
+    var upp;
+
+    $$self.$$.update = function () {
+      var changed = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {
+        tutorialComplete: 1,
+        tutorial: 1,
+        tutorialStep: 1,
+        quiz: 1,
+        quizState: 1,
+        q: 1
+      };
+
+      if (changed.tutorialComplete || changed.tutorial || changed.tutorialStep || changed.quiz || changed.quizState || changed.q) {
+         if (!tutorialComplete) {
+          $$invalidate("modalTitle", modalTitle = tutorial[tutorialStep].title);
+          $$invalidate("modalContent", modalContent = tutorial[tutorialStep].content);
+        } else {
+          var _quiz$filter, _quiz$filter2;
+
+          $$invalidate("q", (_quiz$filter = quiz.filter(function (obj) {
+            return obj.state === quizState;
+          }), _quiz$filter2 = _slicedToArray(_quiz$filter, 1), q = _quiz$filter2[0], _quiz$filter), q);
+          $$invalidate("modalTitle", modalTitle = q.title);
+          $$invalidate("modalContent", modalContent = q.content);
+        }
+      }
+
+      if (changed.tutorialStep) {
+         $$invalidate("down", down = tutorialStep === 1);
+      }
+
+      if (changed.tutorialStep || changed.quizState) {
+         $$invalidate("up", up = tutorialStep === 2 || quizState === "pass");
+      }
+
+      if (changed.tutorialStep) {
+         $$invalidate("right", right = tutorialStep === 3 || tutorialStep === 1);
+      }
+
+      if (changed.tutorialStep) {
+         $$invalidate("upp", upp = tutorialStep === 3);
+      }
+    };
+
+    return {
+      modalOpen: modalOpen,
+      tutorial: tutorial,
+      tutorialStep: tutorialStep,
+      tutorialComplete: tutorialComplete,
+      quiz: quiz,
+      numSegments: numSegments,
+      quizState: quizState,
+      modalTitle: modalTitle,
+      modalContent: modalContent,
+      dispatch: dispatch,
+      backward: backward,
+      forward: forward,
+      dragStart: dragStart,
+      drag: drag,
+      dragEnd: dragEnd,
+      down: down,
+      up: up,
+      right: right,
+      upp: upp,
+      click_handler: click_handler,
+      click_handler_1: click_handler_1,
+      click_handler_2: click_handler_2,
+      click_handler_3: click_handler_3
+    };
+  }
+
+  var Tutorial =
+  /*#__PURE__*/
+  function (_SvelteComponentDev) {
+    _inherits(Tutorial, _SvelteComponentDev);
+
+    function Tutorial(options) {
+      var _this;
+
+      _classCallCheck(this, Tutorial);
+
+      _this = _possibleConstructorReturn(this, _getPrototypeOf(Tutorial).call(this, options));
+      init(_assertThisInitialized(_this), options, instance$2, create_fragment$2, safe_not_equal, {
+        modalOpen: 0,
+        tutorial: 0,
+        tutorialStep: 0,
+        tutorialComplete: 0,
+        quiz: 0,
+        numSegments: 0,
+        quizState: 0
+      });
+      dispatch_dev("SvelteRegisterComponent", {
+        component: _assertThisInitialized(_this),
+        tagName: "Tutorial",
         options: options,
         id: create_fragment$2.name
       });
       var ctx = _this.$$.ctx;
       var props = options.props || {};
 
-      if (ctx.src === undefined && !("src" in props)) {
-        console_1$1.warn("<TagThought> was created without expected prop 'src'");
+      if (ctx.modalOpen === undefined && !("modalOpen" in props)) {
+        console.warn("<Tutorial> was created without expected prop 'modalOpen'");
       }
 
-      if (ctx.currentTrial === undefined && !("currentTrial" in props)) {
-        console_1$1.warn("<TagThought> was created without expected prop 'currentTrial'");
+      if (ctx.tutorial === undefined && !("tutorial" in props)) {
+        console.warn("<Tutorial> was created without expected prop 'tutorial'");
       }
 
-      if (ctx.fileName === undefined && !("fileName" in props)) {
-        console_1$1.warn("<TagThought> was created without expected prop 'fileName'");
+      if (ctx.tutorialComplete === undefined && !("tutorialComplete" in props)) {
+        console.warn("<Tutorial> was created without expected prop 'tutorialComplete'");
+      }
+
+      if (ctx.quiz === undefined && !("quiz" in props)) {
+        console.warn("<Tutorial> was created without expected prop 'quiz'");
+      }
+
+      if (ctx.numSegments === undefined && !("numSegments" in props)) {
+        console.warn("<Tutorial> was created without expected prop 'numSegments'");
+      }
+
+      if (ctx.quizState === undefined && !("quizState" in props)) {
+        console.warn("<Tutorial> was created without expected prop 'quizState'");
       }
 
       return _this;
     }
 
-    _createClass(TagThought, [{
-      key: "src",
+    _createClass(Tutorial, [{
+      key: "modalOpen",
       get: function get() {
-        throw new Error("<TagThought>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+        throw new Error("<Tutorial>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
       },
       set: function set(value) {
-        throw new Error("<TagThought>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+        throw new Error("<Tutorial>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
       }
     }, {
-      key: "currentTrial",
+      key: "tutorial",
       get: function get() {
-        throw new Error("<TagThought>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+        throw new Error("<Tutorial>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
       },
       set: function set(value) {
-        throw new Error("<TagThought>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+        throw new Error("<Tutorial>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
       }
     }, {
-      key: "fileName",
+      key: "tutorialStep",
       get: function get() {
-        throw new Error("<TagThought>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+        throw new Error("<Tutorial>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
       },
       set: function set(value) {
-        throw new Error("<TagThought>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+        throw new Error("<Tutorial>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "tutorialComplete",
+      get: function get() {
+        throw new Error("<Tutorial>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<Tutorial>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "quiz",
+      get: function get() {
+        throw new Error("<Tutorial>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<Tutorial>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "numSegments",
+      get: function get() {
+        throw new Error("<Tutorial>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<Tutorial>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
+      key: "quizState",
+      get: function get() {
+        throw new Error("<Tutorial>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<Tutorial>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
       }
     }]);
 
-    return TagThought;
+    return Tutorial;
   }(SvelteComponentDev);
 
   var file$3 = "src/components/Loading.svelte";
@@ -46801,8 +46047,6 @@ var app = (function () {
     return Loading;
   }(SvelteComponentDev);
 
-  var console_1$2 = globals.console;
-
   function create_catch_block(ctx) {
     var block = {
       c: noop,
@@ -46816,61 +46060,97 @@ var app = (function () {
       block: block,
       id: create_catch_block.name,
       type: "catch",
-      source: "(1:0) <script>   // This is the main experiment page. It takes as input trialOrder, which gets passed in from App.svelte, which itself gets it from firebase. Then it looks at the current trial number the participant is on, gets the audio file URL and passes that info as parameters to the TagThought component.   import { createEventDispatcher }",
+      source: "(1:0) <script>   import { storage }",
       ctx: ctx
     });
     return block;
-  } // (53:0) {:then src}
+  } // (163:0) {:then src}
 
 
   function create_then_block(ctx) {
+    var t;
     var current;
-    var tagthought = new TagThought({
+    var tutorial_1 = new Tutorial({
       props: {
-        src: ctx.src,
-        currentTrial: ctx.currentTrial,
-        fileName: ctx.fileName
+        modalOpen: ctx.modalOpen,
+        tutorial: ctx.tutorial,
+        tutorialStep: ctx.tutorialStep,
+        tutorialComplete: ctx.tutorialComplete,
+        quiz: ctx.quiz,
+        numSegments: ctx.numSegments,
+        quizState: ctx.quizState
       },
       $$inline: true
     });
-    tagthought.$on("next", ctx.getNextAudioFile);
+    tutorial_1.$on("stateChange", ctx.updateTutorialState);
+    tutorial_1.$on("toggleTutorial", ctx.toggleTutorial_handler);
+    tutorial_1.$on("finishedComplete", ctx.finishedComplete_handler);
+    tutorial_1.$on("finishedContinue", ctx.finishedContinue_handler);
+    var thoughttagger = new ThoughtTagger({
+      props: {
+        src: ctx.src,
+        hasTutorial: hasTutorial,
+        tutorialStep: ctx.tutorialStep,
+        quizAnswers: ctx.quizAnswers,
+        quizState: ctx.quizState
+      },
+      $$inline: true
+    });
+    thoughttagger.$on("updateSegmentsCount", ctx.updateSegmentsCount);
+    thoughttagger.$on("quizAttempt", ctx.quizAttempt);
+    thoughttagger.$on("toggleTutorial", ctx.toggleTutorial_handler_1);
+    thoughttagger.$on("readyForExperiment", ctx.readyForExperiment_handler);
     var block = {
       c: function create() {
-        create_component(tagthought.$$.fragment);
+        create_component(tutorial_1.$$.fragment);
+        t = space();
+        create_component(thoughttagger.$$.fragment);
       },
       m: function mount(target, anchor) {
-        mount_component(tagthought, target, anchor);
+        mount_component(tutorial_1, target, anchor);
+        insert_dev(target, t, anchor);
+        mount_component(thoughttagger, target, anchor);
         current = true;
       },
       p: function update(changed, ctx) {
-        var tagthought_changes = {};
-        if (changed.filePromise) tagthought_changes.src = ctx.src;
-        if (changed.currentTrial) tagthought_changes.currentTrial = ctx.currentTrial;
-        if (changed.fileName) tagthought_changes.fileName = ctx.fileName;
-        tagthought.$set(tagthought_changes);
+        var tutorial_1_changes = {};
+        if (changed.modalOpen) tutorial_1_changes.modalOpen = ctx.modalOpen;
+        if (changed.tutorialStep) tutorial_1_changes.tutorialStep = ctx.tutorialStep;
+        if (changed.tutorialComplete) tutorial_1_changes.tutorialComplete = ctx.tutorialComplete;
+        if (changed.numSegments) tutorial_1_changes.numSegments = ctx.numSegments;
+        if (changed.quizState) tutorial_1_changes.quizState = ctx.quizState;
+        tutorial_1.$set(tutorial_1_changes);
+        var thoughttagger_changes = {};
+        if (changed.tutorialStep) thoughttagger_changes.tutorialStep = ctx.tutorialStep;
+        if (changed.quizState) thoughttagger_changes.quizState = ctx.quizState;
+        thoughttagger.$set(thoughttagger_changes);
       },
       i: function intro(local) {
         if (current) return;
-        transition_in(tagthought.$$.fragment, local);
+        transition_in(tutorial_1.$$.fragment, local);
+        transition_in(thoughttagger.$$.fragment, local);
         current = true;
       },
       o: function outro(local) {
-        transition_out(tagthought.$$.fragment, local);
+        transition_out(tutorial_1.$$.fragment, local);
+        transition_out(thoughttagger.$$.fragment, local);
         current = false;
       },
       d: function destroy(detaching) {
-        destroy_component(tagthought, detaching);
+        destroy_component(tutorial_1, detaching);
+        if (detaching) detach_dev(t);
+        destroy_component(thoughttagger, detaching);
       }
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
       id: create_then_block.name,
       type: "then",
-      source: "(53:0) {:then src}",
+      source: "(163:0) {:then src}",
       ctx: ctx
     });
     return block;
-  } // (51:20)    <Loading>Preparing Recording...</Loading> {:then src}
+  } // (161:18)    <Loading>Loading...</Loading> {:then src}
 
 
   function create_pending_block(ctx) {
@@ -46923,18 +46203,18 @@ var app = (function () {
       block: block,
       id: create_pending_block.name,
       type: "pending",
-      source: "(51:20)    <Loading>Preparing Recording...</Loading> {:then src}",
+      source: "(161:18)    <Loading>Loading...</Loading> {:then src}",
       ctx: ctx
     });
     return block;
-  } // (52:2) <Loading>
+  } // (162:2) <Loading>
 
 
   function create_default_slot(ctx) {
     var t;
     var block = {
       c: function create() {
-        t = text("Preparing Recording...");
+        t = text("Loading...");
       },
       m: function mount(target, anchor) {
         insert_dev(target, t, anchor);
@@ -46947,7 +46227,7 @@ var app = (function () {
       block: block,
       id: create_default_slot.name,
       type: "slot",
-      source: "(52:2) <Loading>",
+      source: "(162:2) <Loading>",
       ctx: ctx
     });
     return block;
@@ -46964,6 +46244,446 @@ var app = (function () {
       pending: create_pending_block,
       then: create_then_block,
       catch: create_catch_block,
+      value: "src",
+      error: "null",
+      blocks: [,,,]
+    };
+    handle_promise(promise = ctx.quizAudio, info);
+    var block = {
+      c: function create() {
+        await_block_anchor = empty();
+        info.block.c();
+      },
+      l: function claim(nodes) {
+        throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, await_block_anchor, anchor);
+        info.block.m(target, info.anchor = anchor);
+
+        info.mount = function () {
+          return await_block_anchor.parentNode;
+        };
+
+        info.anchor = await_block_anchor;
+        current = true;
+      },
+      p: function update(changed, new_ctx) {
+        ctx = new_ctx;
+        info.block.p(changed, assign(assign({}, ctx), info.resolved));
+      },
+      i: function intro(local) {
+        if (current) return;
+        transition_in(info.block);
+        current = true;
+      },
+      o: function outro(local) {
+        for (var i = 0; i < 3; i += 1) {
+          var _block = info.blocks[i];
+          transition_out(_block);
+        }
+
+        current = false;
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(await_block_anchor);
+        info.block.d(detaching);
+        info.token = null;
+        info = null;
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_fragment$4.name,
+      type: "component",
+      source: "",
+      ctx: ctx
+    });
+    return block;
+  }
+
+  var hasTutorial = true;
+  var maxQuizAttempts = 2;
+
+  function instance$4($$self, $$props, $$invalidate) {
+    var tutorial = [{
+      title: "Overview",
+      content: "<p>This brief tutorial will introduce you to the interface you will use to complete the task. Feel free to drag and reposition this popup as you progress through each step of the tutorial.</p>",
+      state: "overview"
+    }, {
+      title: "Recording Display",
+      content: "<p>This part of the screen creen contains a visual representation of the audio recording. The top half of this display (in green) shows a zoomed in view of an <strong>audio snippet</strong> of the recording, while the bottom half displays the <strong>full recording</strong> along with a box highlighting the <strong>location of the snippet</strong> within the full recording. Below this are playback controls you can use to play, pause, and adjust the volume of the recording. Playback is synchronized between these controls and the visual display.</p><br><p>You can move to a specific location within the snippet or within the full recording by <strong>clicking</strong> in the top or bottom display respectively. This will move the vertical position indicator to a new timepoint in both displays. You can also scrub through the snippet or full recording by <strong>clicking & dragging</strong> left or right.</p><br/><p>Feel free to click around within this display to get a feel for how you can control your position within the recording. Next to the audio controls is a help button that will show or hide this guide.</p>",
+      state: "recording"
+    }, {
+      title: "Controls",
+      content: "<p>Next to the audio controls you will also find buttons to tag a new thought and submit your responses when you are finished tagging thoughts in this audio file. Below this you will see a section that lists your currently tagged thoughts. As you can see currently no thoughts have been tagged so nothing is visible.</p><br/><p><strong>Try clicking the Tag thought button now.</strong></p>",
+      state: "controls"
+    }, {
+      title: "Tagging Thoughts",
+      content: "Notice how this added a row to the table along with markers to the visual display above. The <span class=\"has-text-weight-bold has-text-grey\">start marker (light grey)</span> indicates the beginning of a tag based on your current position in the audio file. The <span class=\"has-text-weight-bold has-text-grey-darker\">end marker (dark grey)</span> indicates the end of a tag and defaults to 5 seconds after the start marker. <br><br>You should edit these times to match when when you think a new thought begins and when that same thought ends. To edit these times first select this thought by <strong>clicking on its row</strong> within the table. Then <strong>drag the markers</strong> in the display above to make an adjustment. Notice how the values in the table change in sync with your actions in the display above. You can also delete a tag or play audio within a tag verify your work using the buttons that appear. After you finish editing just click on the same thought in the table to deselect it.",
+      state: "overview"
+    }, {
+      title: "Comprehension Check",
+      content: "<p>You now know how to use the controls. Try to identify <strong>three thoughts</strong> within this audio file to continue. We will verify your tags to determine your eligibility to continue with this HIT and earn a bonus payment for tagging more files. If you fail to correctly identify these thoughts you will be paid for the HIT but will not be permitted to continute tagging.</p><br><p>You can bring up and toggle through this guide by clicking the help icon next to the audio controls.</p>",
+      state: "overview"
+    }];
+    var quiz = [{
+      title: "Correct!",
+      content: "<div class=\"content\"><p>Nice job! You did exactly what were looking for. After you finish tagging thoughts there are 3 additional questions we would like you input before submitting your tags.<ol class=\"1\"><li>The approximate time that the speaker in the recording stopped talking</li><li>The clarity of the audio recording</li><li>The difficulty of identifying thoughts based on the speaker style</li><ol>Please complete these now and click the Next button.</p></div>",
+      state: "pass"
+    }, {
+      title: "Try Again",
+      content: "<p>Hmm your tags are not quite what we are looking for. Please adjust your tags and click Done to try verifying your responses again. <br><br> You will only have <strong>1 more chance</strong> to identify the correct tags before you forfeit any bonus payments. Use the help button next to the audio controls to close this guide.</p>",
+      state: "firstattempt"
+    }, {
+      title: "Ineligible",
+      content: "<p>Unfortunately your tags still do not reflect what we are looking for. Therefore you can no longer continue with this HIT and earn bonus payments.<br><br>Do not worry, you will still be compensenated the base payment for this HIT.</p>",
+      state: "fail"
+    }, {
+      title: "Begin HIT",
+      content: "<p>Perfect! You are now eligible to tag more recordings. You will earn a $0.50 bonus for each additional recording you tag thoughts for. Otherwise you can complete this HIT and earn your payment without any bonuses. Please select your preference below </p>",
+      state: "readyForExperiment"
+    }];
+    var quizAnswers = [{
+      startTime: 1,
+      endTime: 7
+    }, {
+      startTime: 7,
+      endTime: 21
+    }, {
+      startTime: 22,
+      endTime: 35
+    }, {
+      startTime: 36,
+      endTime: 49
+    }, {
+      startTime: 50,
+      endTime: 62
+    }, {
+      startTime: 62,
+      endTime: 70
+    }, {
+      startTime: 71,
+      endTime: 88
+    }, {
+      startTime: 89,
+      endTime: 108
+    }, {
+      startTime: 109,
+      endTime: 120
+    }];
+    var modalOpen = true;
+    var numSegments = 0;
+    var quizState = "overview";
+    var tutorialComplete = false;
+    var tutorialStep = 0;
+    var quizAttempts = 0;
+    var quizPassed = false;
+
+    var updateTutorialState = function updateTutorialState(ev) {
+      $$invalidate("tutorialStep", tutorialStep = ev.detail.tutorialStep);
+    };
+
+    var quizAttempt = function quizAttempt(ev) {
+      quizAttempts = ev.detail.quizAttempts;
+      quizPassed = ev.detail.quizPassed;
+
+      if (!quizPassed) {
+        if (quizAttempts === maxQuizAttempts) {
+          $$invalidate("quizState", quizState = "fail");
+        } else {
+          $$invalidate("quizState", quizState = "firstattempt");
+        }
+      } else {
+        $$invalidate("quizState", quizState = "pass");
+      }
+
+      $$invalidate("modalOpen", modalOpen = true);
+      $$invalidate("tutorialComplete", tutorialComplete = true);
+    };
+
+    var updateSegmentsCount = function updateSegmentsCount(ev) {
+      $$invalidate("numSegments", numSegments = ev.detail.numSegments);
+
+      if (ev.detail.moveForward) {
+        $$invalidate("tutorialStep", tutorialStep += 1);
+      }
+    };
+
+    var generateFileUrl = function generateFileUrl() {
+      var _file, url;
+
+      return regeneratorRuntime.async(function generateFileUrl$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              _context.prev = 0;
+              _file = storage.refFromURL("gs://thought-segmentation.appspot.com/quiz.mp3");
+              _context.next = 4;
+              return regeneratorRuntime.awrap(_file.getDownloadURL());
+
+            case 4:
+              url = _context.sent;
+              return _context.abrupt("return", url);
+
+            case 8:
+              _context.prev = 8;
+              _context.t0 = _context["catch"](0);
+              console.error(_context.t0);
+
+            case 11:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, null, null, [[0, 8]]);
+    };
+
+    var quizAudio = generateFileUrl();
+
+    var toggleTutorial_handler = function toggleTutorial_handler() {
+      return $$invalidate("modalOpen", modalOpen = !modalOpen);
+    };
+
+    function finishedComplete_handler(event) {
+      bubble($$self, event);
+    }
+
+    function finishedContinue_handler(event) {
+      bubble($$self, event);
+    }
+
+    var toggleTutorial_handler_1 = function toggleTutorial_handler_1() {
+      return $$invalidate("modalOpen", modalOpen = !modalOpen);
+    };
+
+    var readyForExperiment_handler = function readyForExperiment_handler() {
+      return $$invalidate("quizState", quizState = "readyForExperiment");
+    };
+
+    $$self.$capture_state = function () {
+      return {};
+    };
+
+    $$self.$inject_state = function ($$props) {
+      if ("modalOpen" in $$props) $$invalidate("modalOpen", modalOpen = $$props.modalOpen);
+      if ("numSegments" in $$props) $$invalidate("numSegments", numSegments = $$props.numSegments);
+      if ("quizState" in $$props) $$invalidate("quizState", quizState = $$props.quizState);
+      if ("tutorialComplete" in $$props) $$invalidate("tutorialComplete", tutorialComplete = $$props.tutorialComplete);
+      if ("tutorialStep" in $$props) $$invalidate("tutorialStep", tutorialStep = $$props.tutorialStep);
+      if ("quizAttempts" in $$props) quizAttempts = $$props.quizAttempts;
+      if ("quizPassed" in $$props) quizPassed = $$props.quizPassed;
+      if ("quizAudio" in $$props) $$invalidate("quizAudio", quizAudio = $$props.quizAudio);
+    };
+
+    return {
+      tutorial: tutorial,
+      quiz: quiz,
+      quizAnswers: quizAnswers,
+      modalOpen: modalOpen,
+      numSegments: numSegments,
+      quizState: quizState,
+      tutorialComplete: tutorialComplete,
+      tutorialStep: tutorialStep,
+      updateTutorialState: updateTutorialState,
+      quizAttempt: quizAttempt,
+      updateSegmentsCount: updateSegmentsCount,
+      quizAudio: quizAudio,
+      toggleTutorial_handler: toggleTutorial_handler,
+      finishedComplete_handler: finishedComplete_handler,
+      finishedContinue_handler: finishedContinue_handler,
+      toggleTutorial_handler_1: toggleTutorial_handler_1,
+      readyForExperiment_handler: readyForExperiment_handler
+    };
+  }
+
+  var Quiz =
+  /*#__PURE__*/
+  function (_SvelteComponentDev) {
+    _inherits(Quiz, _SvelteComponentDev);
+
+    function Quiz(options) {
+      var _this;
+
+      _classCallCheck(this, Quiz);
+
+      _this = _possibleConstructorReturn(this, _getPrototypeOf(Quiz).call(this, options));
+      init(_assertThisInitialized(_this), options, instance$4, create_fragment$4, safe_not_equal, {});
+      dispatch_dev("SvelteRegisterComponent", {
+        component: _assertThisInitialized(_this),
+        tagName: "Quiz",
+        options: options,
+        id: create_fragment$4.name
+      });
+      return _this;
+    }
+
+    return Quiz;
+  }(SvelteComponentDev);
+
+  var console_1$1 = globals.console;
+
+  function create_catch_block$1(ctx) {
+    var block = {
+      c: noop,
+      m: noop,
+      p: noop,
+      i: noop,
+      o: noop,
+      d: noop
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_catch_block$1.name,
+      type: "catch",
+      source: "(1:0) <script>   // This is the main experiment page. It takes as input trialOrder, which gets passed in from App.svelte, which itself gets it from firebase. Then it looks at the current trial number the participant is on, gets the audio file URL and passes that info as parameters to the TagThought component.   import { createEventDispatcher }",
+      ctx: ctx
+    });
+    return block;
+  } // (53:0) {:then src}
+
+
+  function create_then_block$1(ctx) {
+    var current;
+    var thoughttagger = new ThoughtTagger({
+      props: {
+        src: ctx.src,
+        currentTrial: ctx.currentTrial,
+        fileName: ctx.fileName
+      },
+      $$inline: true
+    });
+    thoughttagger.$on("next", ctx.getNextAudioFile);
+    var block = {
+      c: function create() {
+        create_component(thoughttagger.$$.fragment);
+      },
+      m: function mount(target, anchor) {
+        mount_component(thoughttagger, target, anchor);
+        current = true;
+      },
+      p: function update(changed, ctx) {
+        var thoughttagger_changes = {};
+        if (changed.filePromise) thoughttagger_changes.src = ctx.src;
+        if (changed.currentTrial) thoughttagger_changes.currentTrial = ctx.currentTrial;
+        if (changed.fileName) thoughttagger_changes.fileName = ctx.fileName;
+        thoughttagger.$set(thoughttagger_changes);
+      },
+      i: function intro(local) {
+        if (current) return;
+        transition_in(thoughttagger.$$.fragment, local);
+        current = true;
+      },
+      o: function outro(local) {
+        transition_out(thoughttagger.$$.fragment, local);
+        current = false;
+      },
+      d: function destroy(detaching) {
+        destroy_component(thoughttagger, detaching);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_then_block$1.name,
+      type: "then",
+      source: "(53:0) {:then src}",
+      ctx: ctx
+    });
+    return block;
+  } // (51:20)    <Loading>Preparing Recording...</Loading> {:then src}
+
+
+  function create_pending_block$1(ctx) {
+    var current;
+    var loading = new Loading({
+      props: {
+        $$slots: {
+          default: [create_default_slot$1]
+        },
+        $$scope: {
+          ctx: ctx
+        }
+      },
+      $$inline: true
+    });
+    var block = {
+      c: function create() {
+        create_component(loading.$$.fragment);
+      },
+      m: function mount(target, anchor) {
+        mount_component(loading, target, anchor);
+        current = true;
+      },
+      p: function update(changed, ctx) {
+        var loading_changes = {};
+
+        if (changed.$$scope) {
+          loading_changes.$$scope = {
+            changed: changed,
+            ctx: ctx
+          };
+        }
+
+        loading.$set(loading_changes);
+      },
+      i: function intro(local) {
+        if (current) return;
+        transition_in(loading.$$.fragment, local);
+        current = true;
+      },
+      o: function outro(local) {
+        transition_out(loading.$$.fragment, local);
+        current = false;
+      },
+      d: function destroy(detaching) {
+        destroy_component(loading, detaching);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_pending_block$1.name,
+      type: "pending",
+      source: "(51:20)    <Loading>Preparing Recording...</Loading> {:then src}",
+      ctx: ctx
+    });
+    return block;
+  } // (52:2) <Loading>
+
+
+  function create_default_slot$1(ctx) {
+    var t;
+    var block = {
+      c: function create() {
+        t = text("Preparing Recording...");
+      },
+      m: function mount(target, anchor) {
+        insert_dev(target, t, anchor);
+      },
+      d: function destroy(detaching) {
+        if (detaching) detach_dev(t);
+      }
+    };
+    dispatch_dev("SvelteRegisterBlock", {
+      block: block,
+      id: create_default_slot$1.name,
+      type: "slot",
+      source: "(52:2) <Loading>",
+      ctx: ctx
+    });
+    return block;
+  }
+
+  function create_fragment$5(ctx) {
+    var await_block_anchor;
+    var promise;
+    var current;
+    var info = {
+      ctx: ctx,
+      current: null,
+      token: null,
+      pending: create_pending_block$1,
+      then: create_then_block$1,
+      catch: create_catch_block$1,
       value: "src",
       error: "null",
       blocks: [,,,]
@@ -47018,7 +46738,7 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_fragment$4.name,
+      id: create_fragment$5.name,
       type: "component",
       source: "",
       ctx: ctx
@@ -47026,7 +46746,7 @@ var app = (function () {
     return block;
   }
 
-  function instance$4($$self, $$props, $$invalidate) {
+  function instance$5($$self, $$props, $$invalidate) {
     var trialOrder = $$props.trialOrder;
     var currentTrial;
     var fileName;
@@ -47105,7 +46825,7 @@ var app = (function () {
 
     var writable_props = ["trialOrder"];
     Object.keys($$props).forEach(function (key) {
-      if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1$2.warn("<Experiment> was created with unknown prop '".concat(key, "'"));
+      if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1$1.warn("<Experiment> was created with unknown prop '".concat(key, "'"));
     });
 
     $$self.$set = function ($$props) {
@@ -47148,20 +46868,20 @@ var app = (function () {
       _classCallCheck(this, Experiment);
 
       _this = _possibleConstructorReturn(this, _getPrototypeOf(Experiment).call(this, options));
-      init(_assertThisInitialized(_this), options, instance$4, create_fragment$4, safe_not_equal, {
+      init(_assertThisInitialized(_this), options, instance$5, create_fragment$5, safe_not_equal, {
         trialOrder: 0
       });
       dispatch_dev("SvelteRegisterComponent", {
         component: _assertThisInitialized(_this),
         tagName: "Experiment",
         options: options,
-        id: create_fragment$4.name
+        id: create_fragment$5.name
       });
       var ctx = _this.$$.ctx;
       var props = options.props || {};
 
       if (ctx.trialOrder === undefined && !("trialOrder" in props)) {
-        console_1$2.warn("<Experiment> was created without expected prop 'trialOrder'");
+        console_1$1.warn("<Experiment> was created without expected prop 'trialOrder'");
       }
 
       return _this;
@@ -47182,7 +46902,7 @@ var app = (function () {
 
   var file$4 = "src/pages/Debrief.svelte";
 
-  function create_fragment$5(ctx) {
+  function create_fragment$6(ctx) {
     var div21;
     var div20;
     var div19;
@@ -47460,7 +47180,7 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_fragment$5.name,
+      id: create_fragment$6.name,
       type: "component",
       source: "",
       ctx: ctx
@@ -47468,7 +47188,7 @@ var app = (function () {
     return block;
   }
 
-  function instance$5($$self, $$props, $$invalidate) {
+  function instance$6($$self, $$props, $$invalidate) {
     var age = "";
     var feedback = "";
     var sex = "";
@@ -47563,12 +47283,12 @@ var app = (function () {
       _classCallCheck(this, Debrief);
 
       _this = _possibleConstructorReturn(this, _getPrototypeOf(Debrief).call(this, options));
-      init(_assertThisInitialized(_this), options, instance$5, create_fragment$5, safe_not_equal, {});
+      init(_assertThisInitialized(_this), options, instance$6, create_fragment$6, safe_not_equal, {});
       dispatch_dev("SvelteRegisterComponent", {
         component: _assertThisInitialized(_this),
         tagName: "Debrief",
         options: options,
-        id: create_fragment$5.name
+        id: create_fragment$6.name
       });
       return _this;
     }
@@ -47576,7 +47296,7 @@ var app = (function () {
     return Debrief;
   }(SvelteComponentDev);
 
-  var file$5 = "src/App.svelte"; // (134:39) 
+  var file$5 = "src/App.svelte"; // (106:39) 
 
   function create_if_block_4$2(ctx) {
     var current;
@@ -47609,11 +47329,11 @@ var app = (function () {
       block: block,
       id: create_if_block_4$2.name,
       type: "if",
-      source: "(134:39) ",
+      source: "(106:39) ",
       ctx: ctx
     });
     return block;
-  } // (132:42) 
+  } // (104:42) 
 
 
   function create_if_block_3$2(ctx) {
@@ -47655,78 +47375,51 @@ var app = (function () {
       block: block,
       id: create_if_block_3$2.name,
       type: "if",
-      source: "(132:42) ",
+      source: "(104:42) ",
       ctx: ctx
     });
     return block;
-  } // (123:36) 
+  } // (100:36) 
 
 
   function create_if_block_2$2(ctx) {
-    var await_block_anchor;
-    var promise;
     var current;
-    var info = {
-      ctx: ctx,
-      current: null,
-      token: null,
-      pending: create_pending_block$1,
-      then: create_then_block$1,
-      catch: create_catch_block$1,
-      value: "src",
-      error: "null",
-      blocks: [,,,]
-    };
-    handle_promise(promise = ctx.quizAudio, info);
+    var quiz = new Quiz({
+      $$inline: true
+    });
+    quiz.$on("finishedComplete", ctx.finishedComplete_handler);
+    quiz.$on("finishedContinue", ctx.finishedContinue_handler);
     var block = {
       c: function create() {
-        await_block_anchor = empty();
-        info.block.c();
+        create_component(quiz.$$.fragment);
       },
       m: function mount(target, anchor) {
-        insert_dev(target, await_block_anchor, anchor);
-        info.block.m(target, info.anchor = anchor);
-
-        info.mount = function () {
-          return await_block_anchor.parentNode;
-        };
-
-        info.anchor = await_block_anchor;
+        mount_component(quiz, target, anchor);
         current = true;
       },
-      p: function update(changed, new_ctx) {
-        ctx = new_ctx;
-        info.block.p(changed, assign(assign({}, ctx), info.resolved));
-      },
+      p: noop,
       i: function intro(local) {
         if (current) return;
-        transition_in(info.block);
+        transition_in(quiz.$$.fragment, local);
         current = true;
       },
       o: function outro(local) {
-        for (var i = 0; i < 3; i += 1) {
-          var _block = info.blocks[i];
-          transition_out(_block);
-        }
-
+        transition_out(quiz.$$.fragment, local);
         current = false;
       },
       d: function destroy(detaching) {
-        if (detaching) detach_dev(await_block_anchor);
-        info.block.d(detaching);
-        info.token = null;
-        info = null;
+        destroy_component(quiz, detaching);
       }
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
       id: create_if_block_2$2.name,
       type: "if",
-      source: "(123:36) ",
+      source: "(100:36) ",
       ctx: ctx
     });
     return block;
-  } // (119:44) 
+  } // (98:44) 
 
 
   function create_if_block_1$2(ctx) {
@@ -47761,11 +47454,11 @@ var app = (function () {
       block: block,
       id: create_if_block_1$2.name,
       type: "if",
-      source: "(119:44) ",
+      source: "(98:44) ",
       ctx: ctx
     });
     return block;
-  } // (117:2) {#if !currentState}
+  } // (96:2) {#if !currentState}
 
 
   function create_if_block$3(ctx) {
@@ -47773,7 +47466,7 @@ var app = (function () {
     var loading = new Loading({
       props: {
         $$slots: {
-          default: [create_default_slot$1]
+          default: [create_default_slot$2]
         },
         $$scope: {
           ctx: ctx
@@ -47818,134 +47511,14 @@ var app = (function () {
       block: block,
       id: create_if_block$3.name,
       type: "if",
-      source: "(117:2) {#if !currentState}",
+      source: "(96:2) {#if !currentState}",
       ctx: ctx
     });
     return block;
-  } // (1:0) <script>   // This is the main Svelte component that will display after a user provides conset within PsiTurk. It serves two main purposes: 1) it initializes a new entry into the firebase database if a workerId from the URL is not found or retrieves an existing record if a workerId is found. Creating a new entry sets up the random trial order the participant will receive for all the recordings. 2) it uses that information to dynamically render different experiment states based upon what a user does i.e. show instructions, show quiz, show experiment, show exit survey. Each of those different states exist as their own .svelte files within the pages/ folder   import { onMount }
+  } // (97:4) <Loading>
 
 
-  function create_catch_block$1(ctx) {
-    var block = {
-      c: noop,
-      m: noop,
-      p: noop,
-      i: noop,
-      o: noop,
-      d: noop
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_catch_block$1.name,
-      type: "catch",
-      source: "(1:0) <script>   // This is the main Svelte component that will display after a user provides conset within PsiTurk. It serves two main purposes: 1) it initializes a new entry into the firebase database if a workerId from the URL is not found or retrieves an existing record if a workerId is found. Creating a new entry sets up the random trial order the participant will receive for all the recordings. 2) it uses that information to dynamically render different experiment states based upon what a user does i.e. show instructions, show quiz, show experiment, show exit survey. Each of those different states exist as their own .svelte files within the pages/ folder   import { onMount }",
-      ctx: ctx
-    });
-    return block;
-  } // (126:4) {:then src}
-
-
-  function create_then_block$1(ctx) {
-    var current;
-    var quiz = new Quiz({
-      props: {
-        src: ctx.src
-      },
-      $$inline: true
-    });
-    quiz.$on("finishedComplete", ctx.finishedComplete_handler);
-    quiz.$on("finishedContinue", ctx.finishedContinue_handler);
-    var block = {
-      c: function create() {
-        create_component(quiz.$$.fragment);
-      },
-      m: function mount(target, anchor) {
-        mount_component(quiz, target, anchor);
-        current = true;
-      },
-      p: noop,
-      i: function intro(local) {
-        if (current) return;
-        transition_in(quiz.$$.fragment, local);
-        current = true;
-      },
-      o: function outro(local) {
-        transition_out(quiz.$$.fragment, local);
-        current = false;
-      },
-      d: function destroy(detaching) {
-        destroy_component(quiz, detaching);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_then_block$1.name,
-      type: "then",
-      source: "(126:4) {:then src}",
-      ctx: ctx
-    });
-    return block;
-  } // (124:22)        <Loading>Loading...</Loading>     {:then src}
-
-
-  function create_pending_block$1(ctx) {
-    var current;
-    var loading = new Loading({
-      props: {
-        $$slots: {
-          default: [create_default_slot_1]
-        },
-        $$scope: {
-          ctx: ctx
-        }
-      },
-      $$inline: true
-    });
-    var block = {
-      c: function create() {
-        create_component(loading.$$.fragment);
-      },
-      m: function mount(target, anchor) {
-        mount_component(loading, target, anchor);
-        current = true;
-      },
-      p: function update(changed, ctx) {
-        var loading_changes = {};
-
-        if (changed.$$scope) {
-          loading_changes.$$scope = {
-            changed: changed,
-            ctx: ctx
-          };
-        }
-
-        loading.$set(loading_changes);
-      },
-      i: function intro(local) {
-        if (current) return;
-        transition_in(loading.$$.fragment, local);
-        current = true;
-      },
-      o: function outro(local) {
-        transition_out(loading.$$.fragment, local);
-        current = false;
-      },
-      d: function destroy(detaching) {
-        destroy_component(loading, detaching);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_pending_block$1.name,
-      type: "pending",
-      source: "(124:22)        <Loading>Loading...</Loading>     {:then src}",
-      ctx: ctx
-    });
-    return block;
-  } // (125:6) <Loading>
-
-
-  function create_default_slot_1(ctx) {
+  function create_default_slot$2(ctx) {
     var t;
     var block = {
       c: function create() {
@@ -47960,39 +47533,15 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_default_slot_1.name,
+      id: create_default_slot$2.name,
       type: "slot",
-      source: "(125:6) <Loading>",
-      ctx: ctx
-    });
-    return block;
-  } // (118:4) <Loading>
-
-
-  function create_default_slot$1(ctx) {
-    var t;
-    var block = {
-      c: function create() {
-        t = text("Loading...");
-      },
-      m: function mount(target, anchor) {
-        insert_dev(target, t, anchor);
-      },
-      d: function destroy(detaching) {
-        if (detaching) detach_dev(t);
-      }
-    };
-    dispatch_dev("SvelteRegisterBlock", {
-      block: block,
-      id: create_default_slot$1.name,
-      type: "slot",
-      source: "(118:4) <Loading>",
+      source: "(97:4) <Loading>",
       ctx: ctx
     });
     return block;
   }
 
-  function create_fragment$6(ctx) {
+  function create_fragment$7(ctx) {
     var section;
     var current_block_type_index;
     var if_block;
@@ -48018,7 +47567,7 @@ var app = (function () {
         section = element("section");
         if (if_block) if_block.c();
         attr_dev(section, "class", "section");
-        add_location(section, file$5, 115, 0, 4858);
+        add_location(section, file$5, 94, 0, 4165);
       },
       l: function claim(nodes) {
         throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -48083,7 +47632,7 @@ var app = (function () {
     };
     dispatch_dev("SvelteRegisterBlock", {
       block: block,
-      id: create_fragment$6.name,
+      id: create_fragment$7.name,
       type: "component",
       source: "",
       ctx: ctx
@@ -48091,7 +47640,7 @@ var app = (function () {
     return block;
   }
 
-  function instance$6($$self, $$props, $$invalidate) {
+  function instance$7($$self, $$props, $$invalidate) {
     var currentState;
     var trialOrder = [];
 
@@ -48128,97 +47677,67 @@ var app = (function () {
       }, null, null, [[1, 9]]);
     };
 
-    var generateFileUrl = function generateFileUrl() {
-      var _file, url;
-
-      return regeneratorRuntime.async(function generateFileUrl$(_context2) {
-        while (1) {
-          switch (_context2.prev = _context2.next) {
-            case 0:
-              _context2.prev = 0;
-              _file = storage.refFromURL("gs://thought-segmentation.appspot.com/quiz.mp3");
-              _context2.next = 4;
-              return regeneratorRuntime.awrap(_file.getDownloadURL());
-
-            case 4:
-              url = _context2.sent;
-              return _context2.abrupt("return", url);
-
-            case 8:
-              _context2.prev = 8;
-              _context2.t0 = _context2["catch"](0);
-              console.error(_context2.t0);
-
-            case 11:
-            case "end":
-              return _context2.stop();
-          }
-        }
-      }, null, null, [[0, 8]]);
-    };
-
-    var quizAudio = generateFileUrl();
     onMount(function _callee2() {
-      return regeneratorRuntime.async(function _callee2$(_context4) {
+      return regeneratorRuntime.async(function _callee2$(_context3) {
         while (1) {
-          switch (_context4.prev = _context4.next) {
+          switch (_context3.prev = _context3.next) {
             case 0:
               try {
                 auth.onAuthStateChanged(function _callee(user) {
                   var resp, data, query;
-                  return regeneratorRuntime.async(function _callee$(_context3) {
+                  return regeneratorRuntime.async(function _callee$(_context2) {
                     while (1) {
-                      switch (_context3.prev = _context3.next) {
+                      switch (_context2.prev = _context2.next) {
                         case 0:
                           if (user) {
-                            _context3.next = 18;
+                            _context2.next = 18;
                             break;
                           }
 
-                          _context3.prev = 1;
-                          _context3.next = 4;
+                          _context2.prev = 1;
+                          _context2.next = 4;
                           return regeneratorRuntime.awrap(auth.signInWithEmailAndPassword("".concat(params.workerId, "@experiment.com"), params.assignmentId));
 
                         case 4:
                           console.log("user found...signing in with credentials");
-                          _context3.next = 16;
+                          _context2.next = 16;
                           break;
 
                         case 7:
-                          _context3.prev = 7;
-                          _context3.t0 = _context3["catch"](1);
+                          _context2.prev = 7;
+                          _context2.t0 = _context2["catch"](1);
 
-                          if (!(_context3.t0.code === "auth/user-not-found")) {
-                            _context3.next = 15;
+                          if (!(_context2.t0.code === "auth/user-not-found")) {
+                            _context2.next = 15;
                             break;
                           }
 
                           console.log("no user found...creating new credentials");
-                          _context3.next = 13;
+                          _context2.next = 13;
                           return regeneratorRuntime.awrap(auth.createUserWithEmailAndPassword("".concat(params.workerId, "@experiment.com"), params.assignmentId));
 
                         case 13:
-                          _context3.next = 16;
+                          _context2.next = 16;
                           break;
 
                         case 15:
-                          console.error(_context3.t0);
+                          console.error(_context2.t0);
 
                         case 16:
-                          _context3.next = 44;
+                          _context2.next = 44;
                           break;
 
                         case 18:
                           console.log("user already authenticated...");
-                          _context3.prev = 19;
-                          _context3.next = 22;
+                          _context2.prev = 19;
+                          _context2.next = 22;
                           return regeneratorRuntime.awrap(db.ref("participants/".concat(params.workerId)).once("value"));
 
                         case 22:
-                          resp = _context3.sent;
+                          resp = _context2.sent;
 
                           if (!(resp.val() !== null)) {
-                            _context3.next = 30;
+                            _context2.next = 30;
                             break;
                           }
 
@@ -48226,20 +47745,20 @@ var app = (function () {
                           $$invalidate("currentState", currentState = data.currentState);
                           $$invalidate("trialOrder", trialOrder = data.trialOrder);
                           console.log("previous document found...loading state...");
-                          _context3.next = 39;
+                          _context2.next = 39;
                           break;
 
                         case 30:
-                          _context3.next = 32;
+                          _context2.next = 32;
                           return regeneratorRuntime.awrap(db.ref("recordings").orderByChild("responses").limitToFirst(10).once("value"));
 
                         case 32:
-                          query = _context3.sent;
+                          query = _context2.sent;
                           query.forEach(function (doc) {
                             trialOrder.push(doc.val().name);
                           });
                           fisherYatesShuffle(trialOrder);
-                          _context3.next = 37;
+                          _context2.next = 37;
                           return regeneratorRuntime.awrap(db.ref("participants/".concat(params.workerId)).set({
                             workerId: params.workerId,
                             assignmentId: params.assignmentId,
@@ -48255,17 +47774,17 @@ var app = (function () {
                           console.log("no previous document found...creating new...");
 
                         case 39:
-                          _context3.next = 44;
+                          _context2.next = 44;
                           break;
 
                         case 41:
-                          _context3.prev = 41;
-                          _context3.t1 = _context3["catch"](19);
-                          console.error(_context3.t1);
+                          _context2.prev = 41;
+                          _context2.t1 = _context2["catch"](19);
+                          console.error(_context2.t1);
 
                         case 44:
                         case "end":
-                          return _context3.stop();
+                          return _context2.stop();
                       }
                     }
                   }, null, null, [[1, 7], [19, 41]]);
@@ -48276,7 +47795,7 @@ var app = (function () {
 
             case 1:
             case "end":
-              return _context4.stop();
+              return _context3.stop();
           }
         }
       });
@@ -48305,14 +47824,12 @@ var app = (function () {
     $$self.$inject_state = function ($$props) {
       if ("currentState" in $$props) $$invalidate("currentState", currentState = $$props.currentState);
       if ("trialOrder" in $$props) $$invalidate("trialOrder", trialOrder = $$props.trialOrder);
-      if ("quizAudio" in $$props) $$invalidate("quizAudio", quizAudio = $$props.quizAudio);
     };
 
     return {
       currentState: currentState,
       trialOrder: trialOrder,
       updateState: updateState,
-      quizAudio: quizAudio,
       finished_handler: finished_handler,
       finishedComplete_handler: finishedComplete_handler,
       finishedContinue_handler: finishedContinue_handler,
@@ -48331,12 +47848,12 @@ var app = (function () {
       _classCallCheck(this, App);
 
       _this = _possibleConstructorReturn(this, _getPrototypeOf(App).call(this, options));
-      init(_assertThisInitialized(_this), options, instance$6, create_fragment$6, safe_not_equal, {});
+      init(_assertThisInitialized(_this), options, instance$7, create_fragment$7, safe_not_equal, {});
       dispatch_dev("SvelteRegisterComponent", {
         component: _assertThisInitialized(_this),
         tagName: "App",
         options: options,
-        id: create_fragment$6.name
+        id: create_fragment$7.name
       });
       return _this;
     }
