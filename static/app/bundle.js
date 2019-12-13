@@ -26738,7 +26738,7 @@ var app = (function () {
     }
   };
 
-  var file = "src/pages/Instructions.svelte"; // (72:14) {:else}
+  var file = "src/pages/Instructions.svelte"; // (70:14) {:else}
 
   function create_else_block(ctx) {
     var span;
@@ -26748,9 +26748,9 @@ var app = (function () {
         span = element("span");
         i = element("i");
         attr_dev(i, "class", "fas fa-forward");
-        add_location(i, file, 73, 18, 3420);
+        add_location(i, file, 71, 18, 3336);
         attr_dev(span, "class", "icon");
-        add_location(span, file, 72, 16, 3382);
+        add_location(span, file, 70, 16, 3298);
       },
       m: function mount(target, anchor) {
         insert_dev(target, span, anchor);
@@ -26764,18 +26764,18 @@ var app = (function () {
       block: block,
       id: create_else_block.name,
       type: "else",
-      source: "(72:14) {:else}",
+      source: "(70:14) {:else}",
       ctx: ctx
     });
     return block;
-  } // (70:14) {#if currentPage === instructions.length - 1}
+  } // (68:14) {#if currentPage === instructions.length - 1}
 
 
   function create_if_block(ctx) {
     var t;
     var block = {
       c: function create() {
-        t = text("Try Practice");
+        t = text("Go To Tutorial");
       },
       m: function mount(target, anchor) {
         insert_dev(target, t, anchor);
@@ -26788,7 +26788,7 @@ var app = (function () {
       block: block,
       id: create_if_block.name,
       type: "if",
-      source: "(70:14) {#if currentPage === instructions.length - 1}",
+      source: "(68:14) {#if currentPage === instructions.length - 1}",
       ctx: ctx
     });
     return block;
@@ -26850,37 +26850,37 @@ var app = (function () {
         button1 = element("button");
         if_block.c();
         attr_dev(h1, "class", "title is-2 custom-card-title svelte-1czeazl");
-        add_location(h1, file, 51, 10, 2600);
+        add_location(h1, file, 49, 10, 2514);
         attr_dev(hr, "class", "no-space-hr svelte-1czeazl");
-        add_location(hr, file, 52, 10, 2669);
+        add_location(hr, file, 50, 10, 2583);
         attr_dev(div0, "class", "has-text-centered");
-        add_location(div0, file, 50, 8, 2558);
+        add_location(div0, file, 48, 8, 2472);
         attr_dev(div1, "class", "content");
-        add_location(div1, file, 55, 10, 2756);
+        add_location(div1, file, 53, 10, 2670);
         attr_dev(div2, "class", "card-content");
-        add_location(div2, file, 54, 8, 2719);
+        add_location(div2, file, 52, 8, 2633);
         attr_dev(i, "class", "fas fa-backward");
-        add_location(i, file, 63, 16, 3055);
+        add_location(i, file, 61, 16, 2969);
         attr_dev(span, "class", "icon");
-        add_location(span, file, 62, 14, 3019);
+        add_location(span, file, 60, 14, 2933);
         attr_dev(button0, "class", "button is-link controls svelte-1czeazl");
-        add_location(button0, file, 61, 12, 2944);
+        add_location(button0, file, 59, 12, 2858);
         attr_dev(p0, "class", "card-footer-item");
-        add_location(p0, file, 60, 10, 2903);
+        add_location(p0, file, 58, 10, 2817);
         attr_dev(button1, "class", "button is-link controls svelte-1czeazl");
-        add_location(button1, file, 68, 12, 3195);
+        add_location(button1, file, 66, 12, 3109);
         attr_dev(p1, "class", "card-footer-item");
-        add_location(p1, file, 67, 10, 3154);
+        add_location(p1, file, 65, 10, 3068);
         attr_dev(footer, "class", "card-footer");
-        add_location(footer, file, 59, 8, 2864);
+        add_location(footer, file, 57, 8, 2778);
         attr_dev(div3, "class", "card");
-        add_location(div3, file, 49, 6, 2531);
+        add_location(div3, file, 47, 6, 2445);
         attr_dev(div4, "class", "column is-three-fifths ");
-        add_location(div4, file, 48, 4, 2487);
+        add_location(div4, file, 46, 4, 2401);
         attr_dev(div5, "class", "columns is-centered");
-        add_location(div5, file, 47, 2, 2449);
+        add_location(div5, file, 45, 2, 2363);
         attr_dev(div6, "class", "container");
-        add_location(div6, file, 46, 0, 2423);
+        add_location(div6, file, 44, 0, 2337);
         dispose = [listen_dev(button0, "click", ctx.backward, false, false, false), listen_dev(button1, "click", ctx.forward, false, false, false)];
       },
       l: function claim(nodes) {
@@ -26942,7 +26942,7 @@ var app = (function () {
   }
 
   function instance($$self, $$props, $$invalidate) {
-    var instructions = ["In this task, you will listen to a series of audio recordings (~2 min) in which you will hear people describing characters from a television drama. The goal of this task is to divide the audio into separate speech segments or thoughts.<br><br> While listening, pay close attention to where there are natural breaks in the person's speech, demarcating a separate thought.", "You will be able to play and pause each recording using buttons on screen. Click the Tag Thought button to tag a speech segment that you feel represents a complete thought. You can adjust the start and end times of the segment by dragging the sliders on the audio waveform. As you listen keep tagging new thoughts as you detect them.<br><br>You can always go back and edit segments by clicking on them in the table below the controls.", "When you are finished with a recording click the Finish button to move onto the next recording. You will complete a total of <b>N</b> recordings for this HIT.", "If these instructions make sense click the button below to try a practice trial. Otherwise feel free to go back through the instructions to make sure you understand this task"];
+    var instructions = ["In this task, you will listen to a series of audio recordings (~2 min) in which you will hear people describing characters from a television drama. The goal of this task is to divide the audio into separate speech segments or thoughts.<br><br> While listening, pay close attention to where there are natural breaks in the person's speech, demarcating a separate thought.", "To faciliate this task the next screen will walk you through a guided tutorial that teached you how to use our custom interface. At the end of this tutorial will be a short comprehension quiz to check the quality of your tags. You will have <strong>2 attempts</strong> to pass this quiz.<br><br> If you fail to pass this quiz you will only be paid the base amount for accepting this HIT.<br><br> If you pass this quiz you will be eligible to earn bonus payments for each audio recording you tag at the rate of <strong>$X per recording.</strong>", "If these instructions make sense and you would like to begin click the button below to proceed to the tutorial. Otherwise please return this HIT."];
     var dispatch = createEventDispatcher();
     var currentPage = 0;
 

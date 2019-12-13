@@ -6,11 +6,9 @@
   const instructions = [
     "In this task, you will listen to a series of audio recordings (~2 min) in which you will hear people describing characters from a television drama. The goal of this task is to divide the audio into separate speech segments or thoughts.<br><br> While listening, pay close attention to where there are natural breaks in the person's speech, demarcating a separate thought.",
 
-    'You will be able to play and pause each recording using buttons on screen. Click the Tag Thought button to tag a speech segment that you feel represents a complete thought. You can adjust the start and end times of the segment by dragging the sliders on the audio waveform. As you listen keep tagging new thoughts as you detect them.<br><br>You can always go back and edit segments by clicking on them in the table below the controls.',
+    'To faciliate this task the next screen will walk you through a guided tutorial that teached you how to use our custom interface. At the end of this tutorial will be a short comprehension quiz to check the quality of your tags. You will have <strong>2 attempts</strong> to pass this quiz.<br><br> If you fail to pass this quiz you will only be paid the base amount for accepting this HIT.<br><br> If you pass this quiz you will be eligible to earn bonus payments for each audio recording you tag at the rate of <strong>$X per recording.</strong>',
 
-    'When you are finished with a recording click the Finish button to move onto the next recording. You will complete a total of <b>N</b> recordings for this HIT.',
-
-    'If these instructions make sense click the button below to try a practice trial. Otherwise feel free to go back through the instructions to make sure you understand this task'
+    'If these instructions make sense and you would like to begin click the button below to proceed to the tutorial. Otherwise please return this HIT.'
   ];
 
   const dispatch = createEventDispatcher();
@@ -68,7 +66,7 @@
           <p class="card-footer-item">
             <button class="button is-link controls" on:click={forward}>
               {#if currentPage === instructions.length - 1}
-                Try Practice
+                Go To Tutorial
               {:else}
                 <span class="icon">
                   <i class="fas fa-forward" />
