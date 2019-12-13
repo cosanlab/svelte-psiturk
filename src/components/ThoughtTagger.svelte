@@ -2,9 +2,10 @@
   // This is the main ThoughTagging component that gets rendered within Experiment.svelte. It takes as an "argument" a "src" value from Experiment.svelte that tells it which audo file to render
   import Peaks from 'peaks.js';
   import { onMount, createEventDispatcher } from 'svelte';
-  import { db, params, serverTime } from '../utils.js';
+  import { db, serverTime } from '../utils.js';
 
   // Input variables
+  export let params;
   export let src;
   export let currentTrial = NaN;
   export let fileName = '';
@@ -177,6 +178,7 @@
   };
 
   // Store a new segment on button click
+  // TODO: move playback head to segment endTime ensuring next segment doesn't have overlapping start and end times
   function addSegment() {
     peaksInstance.segments.add({
       startTime: peaksInstance.player.getCurrentTime(),

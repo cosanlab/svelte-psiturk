@@ -15,8 +15,9 @@
 	<script src="/static/lib/d3.v3.min.js" type="text/javascript"> </script>
 
 	<script type="text/javascript">
-		// These fields provided by the psiTurk Server
-		// They are passed to Svelte in the consent.html template by adding them to the window.location as parameters
+		// These fields provided by the psiTurk Server used in 2 places
+		// 1. When the experiment is done and the psitTurk window listens for a 'message' from the Svelte window using the event listener below to finish the HIT in the psiTurk side
+		// 2. Passed to the iframe URL as params that Svelte uses internally to create a user account
 		var uniqueId = "{{ uniqueId }}";
 		var condition = "{{ condition }}";
 		var counterbalance = "{{ counterbalance }}";
@@ -43,13 +44,19 @@
 
 <body>
 	<!-- Inject Svelte app here as an iframe -->
-	<iframe src="app.html" frameborder="0" height="100%" width="100%"></iframe>
+	<iframe src="app.html" id='app' frameborder="0" height="100%" width="100%"></iframe>
 	<noscript>
 		<h1>Warning: Javascript seems to be disabled</h1>
 		<p>This website requires that Javascript be enabled on your browser.</p>
 		<p>Instructions for enabling Javascript in your browser can be found
 			<a href="http://support.google.com/bin/answer.py?hl=en&answer=23852">here</a></p>
 	</noscript>
+	<script type='text/javascript'>
+		// Pass psiTurk URL params to svelte which is created from within an iframe
+		var params = window.location.href.split('?')[1];
+		var iframe = document.getElementById('app')
+		iframe.src = iframe.src + '?' + params;
+	</script>
 </body>
 
 </html>

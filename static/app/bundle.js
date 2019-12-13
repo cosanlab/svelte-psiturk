@@ -6763,7 +6763,7 @@ var app = (function () {
   exports.validateCallback = validateCallback;
   exports.validateContextObject = validateContextObject;
   exports.validateNamespace = validateNamespace;
-  //# sourceMappingURL=index.cjs.js.map
+
   });
 
   unwrapExports(index_cjs);
@@ -7025,7 +7025,6 @@ var app = (function () {
           inst.logLevel = level;
       });
   }
-  //# sourceMappingURL=index.esm.js.map
 
   var index_esm = /*#__PURE__*/Object.freeze({
     __proto__: null,
@@ -7608,7 +7607,7 @@ var app = (function () {
 
   exports.default = firebase;
   exports.firebase = firebase;
-  //# sourceMappingURL=index.cjs.js.map
+
   });
 
   var firebase = unwrapExports(index_cjs$1);
@@ -22769,7 +22768,7 @@ var app = (function () {
   exports.ServerValue = ServerValue;
   exports.enableLogging = enableLogging;
   exports.registerDatabase = registerDatabase;
-  //# sourceMappingURL=index.cjs.js.map
+
   });
 
   unwrapExports(index_cjs$3);
@@ -26336,7 +26335,6 @@ var app = (function () {
       true);
   }
   registerStorage(firebase);
-  //# sourceMappingURL=index.esm.js.map
 
   (function() {var k,aa="function"==typeof Object.defineProperties?Object.defineProperty:function(a,b,c){a!=Array.prototype&&a!=Object.prototype&&(a[b]=c.value);},ba="undefined"!=typeof window&&window===this?this:"undefined"!=typeof global&&null!=global?global:this;function ca(a,b){if(b){var c=ba;a=a.split(".");for(var d=0;d<a.length-1;d++){var e=a[d];e in c||(c[e]={});c=c[e];}a=a[a.length-1];d=c[a];b=b(d);b!=d&&null!=b&&aa(c,a,{configurable:!0,writable:!0,value:b});}}
   function da(a){var b=0;return function(){return b<a.length?{done:!1,value:a[b++]}:{done:!0}}}function ea(a){var b="undefined"!=typeof Symbol&&Symbol.iterator&&a[Symbol.iterator];return b?b.call(a):{next:da(a)}}
@@ -26674,8 +26672,6 @@ var app = (function () {
   wg,[V("providerId")]);Z(a,"PhoneAuthProvider",Tg,[Dn()]);Z(a,"RecaptchaVerifier",wn,[X(V(),Cn(),"recaptchaContainer"),W("recaptchaParameters",!0),En()]);Z(a,"ActionCodeURL",qf,[]);firebase.INTERNAL.registerService("auth",function(b,c){b=new Km(b);c({INTERNAL:{getUid:t(b.getUid,b),getToken:t(b.cc,b),addAuthTokenListener:t(b.Wb,b),removeAuthTokenListener:t(b.Ec,b)}});return b},a,function(b,c){if("create"===b)try{c.auth();}catch(d){}});firebase.INTERNAL.extendNamespace({User:Q});}else throw Error("Cannot find the firebase namespace; be sure to include firebase-app.js before this library.");
   })();}).apply(typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : typeof window !== 'undefined' ? window : {});
 
-  //# sourceMappingURL=auth.esm.js.map
-
   var firebaseConfig = {
     apiKey: 'AIzaSyBSDQTQrnklilGdmyZcEXMGhIwg0dFpNlY',
     authDomain: 'thought-segmentation.firebaseapp.com',
@@ -26711,6 +26707,8 @@ var app = (function () {
     }
 
     if (!params.workerId && !params.assignmentId && !params.hitId) {
+      console.log('Referring URL is NOT psiTurk....creating fake workerId');
+      console.log('MAKE SURE TO REMOVE THIS IN CODE BEFORE GOING LIVE');
       params.workerId = 'test-worker';
       params.assignmentId = 'test-assignment';
       params.hitId = 'test-hit';
@@ -26718,7 +26716,6 @@ var app = (function () {
 
     return params;
   }; // Use those functions to get the window URL params and make them available throughout the app
-
 
   var params = getURLParams(); // Shuffle array elements inplace: https://javascript.info/task/shuffle
 
@@ -43541,7 +43538,7 @@ var app = (function () {
   }();
   },{}]},{},[70])(70)
   });
-  //# sourceMappingURL=peaks.js.map
+
   });
 
   var Peaks = unwrapExports(peaks);
@@ -43554,7 +43551,7 @@ var app = (function () {
     child_ctx.segment = list[i];
     child_ctx.i = i;
     return child_ctx;
-  } // (270:6) {:else}
+  } // (271:6) {:else}
 
 
   function create_else_block_3(ctx) {
@@ -43567,7 +43564,7 @@ var app = (function () {
         t0 = text("Recording #");
         t1 = text(ctx.currentTrial);
         attr_dev(h1, "class", "title");
-        add_location(h1, file$1, 270, 8, 8819);
+        add_location(h1, file$1, 271, 8, 8832);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h1, anchor);
@@ -43585,11 +43582,11 @@ var app = (function () {
       block: block,
       id: create_else_block_3.name,
       type: "else",
-      source: "(270:6) {:else}",
+      source: "(271:6) {:else}",
       ctx: ctx
     });
     return block;
-  } // (268:6) {#if hasTutorial}
+  } // (269:6) {#if hasTutorial}
 
 
   function create_if_block_6(ctx) {
@@ -43599,7 +43596,7 @@ var app = (function () {
         h1 = element("h1");
         h1.textContent = "Example Recording";
         attr_dev(h1, "class", "title");
-        add_location(h1, file$1, 268, 8, 8756);
+        add_location(h1, file$1, 269, 8, 8769);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h1, anchor);
@@ -43613,11 +43610,11 @@ var app = (function () {
       block: block,
       id: create_if_block_6.name,
       type: "if",
-      source: "(268:6) {#if hasTutorial}",
+      source: "(269:6) {#if hasTutorial}",
       ctx: ctx
     });
     return block;
-  } // (273:6) {#if peaksLoading}
+  } // (274:6) {#if peaksLoading}
 
 
   function create_if_block_5(ctx) {
@@ -43631,10 +43628,10 @@ var app = (function () {
         t1 = space();
         button = element("button");
         attr_dev(h3, "class", "title is-3");
-        add_location(h3, file$1, 273, 8, 8913);
+        add_location(h3, file$1, 274, 8, 8926);
         attr_dev(button, "class", "button is-white is-loading loading-button svelte-fkpnm1");
         button.disabled = true;
-        add_location(button, file$1, 274, 8, 8966);
+        add_location(button, file$1, 275, 8, 8979);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h3, anchor);
@@ -43651,11 +43648,11 @@ var app = (function () {
       block: block,
       id: create_if_block_5.name,
       type: "if",
-      source: "(273:6) {#if peaksLoading}",
+      source: "(274:6) {#if peaksLoading}",
       ctx: ctx
     });
     return block;
-  } // (302:14) {#if hasTutorial}
+  } // (303:14) {#if hasTutorial}
 
 
   function create_if_block_4(ctx) {
@@ -43667,9 +43664,9 @@ var app = (function () {
         span = element("span");
         i = element("i");
         attr_dev(i, "class", "fas fa-question-circle fa-2x fa-fw");
-        add_location(i, file$1, 303, 18, 10280);
+        add_location(i, file$1, 304, 18, 10293);
         attr_dev(span, "class", "icon is-large");
-        add_location(span, file$1, 302, 16, 10189);
+        add_location(span, file$1, 303, 16, 10202);
         dispose = listen_dev(span, "click", ctx.click_handler, false, false, false);
       },
       m: function mount(target, anchor) {
@@ -43686,11 +43683,11 @@ var app = (function () {
       block: block,
       id: create_if_block_4.name,
       type: "if",
-      source: "(302:14) {#if hasTutorial}",
+      source: "(303:14) {#if hasTutorial}",
       ctx: ctx
     });
     return block;
-  } // (318:10) {:else}
+  } // (319:10) {:else}
 
 
   function create_else_block_2(ctx) {
@@ -43739,34 +43736,34 @@ var app = (function () {
         button3.textContent = "Delete";
         attr_dev(button0, "class", button0_class_value = "" + (null_to_empty(ctx.hasTutorial && ctx.tutorialStep === 2 ? "button is-primary is-large animated flash delay-1s" : "button is-primary is-large") + " svelte-fkpnm1"));
         toggle_class(button0, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
-        add_location(button0, file$1, 322, 20, 10956);
+        add_location(button0, file$1, 323, 20, 10969);
         attr_dev(button1, "class", "button is-info is-large svelte-fkpnm1");
         button1.disabled = ctx.ratingActive;
         toggle_class(button1, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
-        add_location(button1, file$1, 328, 20, 11302);
+        add_location(button1, file$1, 329, 20, 11315);
         attr_dev(div0, "class", "column button-col svelte-fkpnm1");
-        add_location(div0, file$1, 321, 18, 10904);
+        add_location(div0, file$1, 322, 18, 10917);
         attr_dev(div1, "class", "columns button-row svelte-fkpnm1");
-        add_location(div1, file$1, 320, 16, 10853);
+        add_location(div1, file$1, 321, 16, 10866);
         attr_dev(p, "class", "is-size-7");
         toggle_class(p, "is-invisible", ctx.segments.length === 0);
-        add_location(p, file$1, 339, 20, 11724);
+        add_location(p, file$1, 340, 20, 11737);
         attr_dev(div2, "class", "column");
-        add_location(div2, file$1, 338, 18, 11683);
+        add_location(div2, file$1, 339, 18, 11696);
         attr_dev(div3, "class", "columns");
-        add_location(div3, file$1, 337, 16, 11643);
+        add_location(div3, file$1, 338, 16, 11656);
         attr_dev(div4, "class", "column is-narrow");
-        add_location(div4, file$1, 319, 14, 10806);
+        add_location(div4, file$1, 320, 14, 10819);
         attr_dev(button2, "class", "button is-success is-large");
         toggle_class(button2, "is-invisible", !ctx.rowSelected);
-        add_location(button2, file$1, 346, 16, 11993);
+        add_location(button2, file$1, 347, 16, 12006);
         attr_dev(button3, "class", "button is-danger is-large");
         toggle_class(button3, "is-invisible", !ctx.rowSelected);
-        add_location(button3, file$1, 352, 16, 12213);
+        add_location(button3, file$1, 353, 16, 12226);
         attr_dev(div5, "class", "column");
-        add_location(div5, file$1, 345, 14, 11956);
+        add_location(div5, file$1, 346, 14, 11969);
         attr_dev(div6, "class", "columns is-gapless");
-        add_location(div6, file$1, 318, 12, 10759);
+        add_location(div6, file$1, 319, 12, 10772);
         dispose = [listen_dev(button0, "click", ctx.addSegment, false, false, false), listen_dev(button1, "click", ctx.submitTags, false, false, false), listen_dev(button2, "click", ctx.playSegment, false, false, false), listen_dev(button3, "click", ctx.deleteSegment, false, false, false)];
       },
       m: function mount(target, anchor) {
@@ -43827,11 +43824,11 @@ var app = (function () {
       block: block,
       id: create_else_block_2.name,
       type: "else",
-      source: "(318:10) {:else}",
+      source: "(319:10) {:else}",
       ctx: ctx
     });
     return block;
-  } // (311:10) {#if rate}
+  } // (312:10) {#if rate}
 
 
   function create_if_block_3(ctx) {
@@ -43845,7 +43842,7 @@ var app = (function () {
         t = text("Next");
         attr_dev(button, "class", button_class_value = ctx.hasTutorial ? "button is-primary is-large animated flash delay-1s" : "button is-primary is-large");
         button.disabled = ctx.nextTrialActive;
-        add_location(button, file$1, 311, 12, 10486);
+        add_location(button, file$1, 312, 12, 10499);
         dispose = listen_dev(button, "click", ctx.finish, false, false, false);
       },
       m: function mount(target, anchor) {
@@ -43870,11 +43867,11 @@ var app = (function () {
       block: block,
       id: create_if_block_3.name,
       type: "if",
-      source: "(311:10) {#if rate}",
+      source: "(312:10) {#if rate}",
       ctx: ctx
     });
     return block;
-  } // (424:2) {:else}
+  } // (425:2) {:else}
 
 
   function create_else_block$1(ctx) {
@@ -43894,10 +43891,10 @@ var app = (function () {
         div0 = element("div");
         if_block.c();
         attr_dev(div0, "class", "column is-full has-text-centered");
-        add_location(div0, file$1, 426, 6, 14840);
+        add_location(div0, file$1, 427, 6, 14853);
         attr_dev(div1, "class", "columns is-centered svelte-fkpnm1");
         toggle_class(div1, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
-        add_location(div1, file$1, 425, 4, 14755);
+        add_location(div1, file$1, 426, 4, 14768);
       },
       m: function mount(target, anchor) {
         insert_dev(target, div1, anchor);
@@ -43930,11 +43927,11 @@ var app = (function () {
       block: block,
       id: create_else_block$1.name,
       type: "else",
-      source: "(424:2) {:else}",
+      source: "(425:2) {:else}",
       ctx: ctx
     });
     return block;
-  } // (366:2) {#if rate}
+  } // (367:2) {#if rate}
 
 
   function create_if_block$1(ctx) {
@@ -44016,57 +44013,57 @@ var app = (function () {
         p5 = element("p");
         p5.textContent = "Effortless";
         attr_dev(label, "class", "label has-text-weight-normal is-size-5");
-        add_location(label, file$1, 370, 10, 12722);
+        add_location(label, file$1, 371, 10, 12735);
         attr_dev(input0, "class", input0_class_value = ctx.invalidTime ? "input age-input is-danger" : "input age-input");
         attr_dev(input0, "type", "text");
         attr_dev(input0, "placeholder", "Please enter a timestamp like MM:SS");
-        add_location(input0, file$1, 374, 12, 12887);
+        add_location(input0, file$1, 375, 12, 12900);
         attr_dev(div0, "class", "control");
-        add_location(div0, file$1, 373, 10, 12853);
+        add_location(div0, file$1, 374, 10, 12866);
         attr_dev(div1, "class", "field");
-        add_location(div1, file$1, 369, 8, 12692);
+        add_location(div1, file$1, 370, 8, 12705);
         attr_dev(div2, "class", "column is-narrow has-text-centered");
-        add_location(div2, file$1, 368, 6, 12635);
+        add_location(div2, file$1, 369, 6, 12648);
         attr_dev(p0, "class", "has-text-centered is-size-5");
-        add_location(p0, file$1, 387, 8, 13415);
+        add_location(p0, file$1, 388, 8, 13428);
         attr_dev(input1, "step", "1");
         attr_dev(input1, "min", "0");
         attr_dev(input1, "max", "100");
         attr_dev(input1, "type", "range");
-        add_location(input1, file$1, 388, 8, 13510);
+        add_location(input1, file$1, 389, 8, 13523);
         attr_dev(p1, "class", "subtitle is-size-6");
-        add_location(p1, file$1, 397, 12, 13794);
+        add_location(p1, file$1, 398, 12, 13807);
         attr_dev(div3, "class", "column has-text-left");
-        add_location(div3, file$1, 396, 10, 13747);
+        add_location(div3, file$1, 397, 10, 13760);
         attr_dev(p2, "class", "subtitle is-size-6");
-        add_location(p2, file$1, 400, 12, 13919);
+        add_location(p2, file$1, 401, 12, 13932);
         attr_dev(div4, "class", "column has-text-right");
-        add_location(div4, file$1, 399, 10, 13871);
+        add_location(div4, file$1, 400, 10, 13884);
         attr_dev(div5, "class", "columns is-mobile is-centered");
-        add_location(div5, file$1, 395, 8, 13693);
+        add_location(div5, file$1, 396, 8, 13706);
         attr_dev(div6, "class", "column is-4-desktop is-3-fullhd has-text-centered");
-        add_location(div6, file$1, 386, 6, 13343);
+        add_location(div6, file$1, 387, 6, 13356);
         attr_dev(p3, "class", "has-text-centered is-size-5");
-        add_location(p3, file$1, 405, 8, 14084);
+        add_location(p3, file$1, 406, 8, 14097);
         attr_dev(input2, "step", "1");
         attr_dev(input2, "min", "0");
         attr_dev(input2, "max", "100");
         attr_dev(input2, "type", "range");
-        add_location(input2, file$1, 406, 8, 14178);
+        add_location(input2, file$1, 407, 8, 14191);
         attr_dev(p4, "class", "subtitle is-size-6");
-        add_location(p4, file$1, 415, 12, 14468);
+        add_location(p4, file$1, 416, 12, 14481);
         attr_dev(div7, "class", "column has-text-left");
-        add_location(div7, file$1, 414, 10, 14421);
+        add_location(div7, file$1, 415, 10, 14434);
         attr_dev(p5, "class", "subtitle is-size-6");
-        add_location(p5, file$1, 418, 12, 14588);
+        add_location(p5, file$1, 419, 12, 14601);
         attr_dev(div8, "class", "column has-text-right");
-        add_location(div8, file$1, 417, 10, 14540);
+        add_location(div8, file$1, 418, 10, 14553);
         attr_dev(div9, "class", "columns is-mobile is-centered");
-        add_location(div9, file$1, 413, 8, 14367);
+        add_location(div9, file$1, 414, 8, 14380);
         attr_dev(div10, "class", "column is-4-desktop is-3-fullhd has-text-centered");
-        add_location(div10, file$1, 404, 6, 14012);
+        add_location(div10, file$1, 405, 6, 14025);
         attr_dev(div11, "class", "columns is-centered");
-        add_location(div11, file$1, 367, 4, 12595);
+        add_location(div11, file$1, 368, 4, 12608);
         dispose = [listen_dev(input0, "input", ctx.input0_input_handler), listen_dev(input0, "keyup", ctx.keyup_handler, false, false, false), listen_dev(input1, "change", ctx.input1_change_input_handler), listen_dev(input1, "input", ctx.input1_change_input_handler), listen_dev(input1, "click", ctx.click_handler_1, {
           once: true
         }, false, false), listen_dev(input2, "change", ctx.input2_change_input_handler), listen_dev(input2, "input", ctx.input2_change_input_handler), listen_dev(input2, "click", ctx.click_handler_2, {
@@ -44149,11 +44146,11 @@ var app = (function () {
       block: block,
       id: create_if_block$1.name,
       type: "if",
-      source: "(366:2) {#if rate}",
+      source: "(367:2) {#if rate}",
       ctx: ctx
     });
     return block;
-  } // (449:8) {:else}
+  } // (450:8) {:else}
 
 
   function create_else_block_1(ctx) {
@@ -44163,7 +44160,7 @@ var app = (function () {
         h2 = element("h2");
         h2.textContent = "No Thoughts Tagged";
         attr_dev(h2, "class", "title is-4");
-        add_location(h2, file$1, 449, 10, 15746);
+        add_location(h2, file$1, 450, 10, 15759);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h2, anchor);
@@ -44177,11 +44174,11 @@ var app = (function () {
       block: block,
       id: create_else_block_1.name,
       type: "else",
-      source: "(449:8) {:else}",
+      source: "(450:8) {:else}",
       ctx: ctx
     });
     return block;
-  } // (428:8) {#if segments && segments.length}
+  } // (429:8) {#if segments && segments.length}
 
 
   function create_if_block_2(ctx) {
@@ -44231,16 +44228,16 @@ var app = (function () {
           each_blocks[_i].c();
         }
 
-        add_location(th0, file$1, 432, 18, 15077);
-        add_location(th1, file$1, 433, 18, 15119);
-        add_location(th2, file$1, 434, 18, 15157);
-        add_location(tr, file$1, 431, 16, 15054);
-        add_location(thead, file$1, 430, 14, 15030);
-        add_location(tbody, file$1, 437, 14, 15234);
+        add_location(th0, file$1, 433, 18, 15090);
+        add_location(th1, file$1, 434, 18, 15132);
+        add_location(th2, file$1, 435, 18, 15170);
+        add_location(tr, file$1, 432, 16, 15067);
+        add_location(thead, file$1, 431, 14, 15043);
+        add_location(tbody, file$1, 438, 14, 15247);
         attr_dev(table, "class", "table is-hoverable svelte-fkpnm1");
-        add_location(table, file$1, 429, 12, 14981);
+        add_location(table, file$1, 430, 12, 14994);
         attr_dev(div, "class", "table-container");
-        add_location(div, file$1, 428, 10, 14939);
+        add_location(div, file$1, 429, 10, 14952);
       },
       m: function mount(target, anchor) {
         insert_dev(target, div, anchor);
@@ -44275,11 +44272,11 @@ var app = (function () {
       block: block,
       id: create_if_block_2.name,
       type: "if",
-      source: "(428:8) {#if segments && segments.length}",
+      source: "(429:8) {#if segments && segments.length}",
       ctx: ctx
     });
     return block;
-  } // (439:16) {#each segments as segment, i (segment.id)}
+  } // (440:16) {#each segments as segment, i (segment.id)}
 
 
   function create_each_block(key_1, ctx) {
@@ -44313,13 +44310,13 @@ var app = (function () {
         t5 = space();
         attr_dev(td0, "type", "text");
         attr_dev(td0, "class", "segment-id");
-        add_location(td0, file$1, 440, 20, 15388);
+        add_location(td0, file$1, 441, 20, 15401);
         attr_dev(td1, "type", "number");
-        add_location(td1, file$1, 441, 20, 15485);
+        add_location(td1, file$1, 442, 20, 15498);
         attr_dev(td2, "type", "number");
-        add_location(td2, file$1, 442, 20, 15559);
+        add_location(td2, file$1, 443, 20, 15572);
         attr_dev(tr, "class", "table-row");
-        add_location(tr, file$1, 439, 18, 15320);
+        add_location(tr, file$1, 440, 18, 15333);
         dispose = listen_dev(tr, "click", ctx.selectSegment, false, false, false);
         this.first = tr;
       },
@@ -44349,11 +44346,11 @@ var app = (function () {
       block: block,
       id: create_each_block.name,
       type: "each",
-      source: "(439:16) {#each segments as segment, i (segment.id)}",
+      source: "(440:16) {#each segments as segment, i (segment.id)}",
       ctx: ctx
     });
     return block;
-  } // (382:10) {#if invalidTime}
+  } // (383:10) {#if invalidTime}
 
 
   function create_if_block_1(ctx) {
@@ -44363,7 +44360,7 @@ var app = (function () {
         p = element("p");
         p.textContent = "Invalid timestamp. Please use MM:SS format.";
         attr_dev(p, "class", "help is-danger");
-        add_location(p, file$1, 382, 12, 13219);
+        add_location(p, file$1, 383, 12, 13232);
       },
       m: function mount(target, anchor) {
         insert_dev(target, p, anchor);
@@ -44376,7 +44373,7 @@ var app = (function () {
       block: block,
       id: create_if_block_1.name,
       type: "if",
-      source: "(382:10) {#if invalidTime}",
+      source: "(383:10) {#if invalidTime}",
       ctx: ctx
     });
     return block;
@@ -44465,41 +44462,41 @@ var app = (function () {
         attr_dev(div0, "id", "waveform-container");
         attr_dev(div0, "class", div0_class_value = "" + (null_to_empty(ctx.hasTutorial && ctx.tutorialStep === 1 ? "animated flash slow" : "") + " svelte-fkpnm1"));
         toggle_class(div0, "blur", ctx.hasTutorial && ctx.tutorialStep < 1);
-        add_location(div0, file$1, 276, 6, 9054);
+        add_location(div0, file$1, 277, 6, 9067);
         attr_dev(div1, "class", "column is-full has-text-centered");
-        add_location(div1, file$1, 266, 4, 8677);
+        add_location(div1, file$1, 267, 4, 8690);
         attr_dev(div2, "class", "columns is-centered");
         attr_dev(div2, "id", "row-title-waveform");
-        add_location(div2, file$1, 265, 2, 8615);
+        add_location(div2, file$1, 266, 2, 8628);
         if (source.src !== (source_src_value = ctx.src)) attr_dev(source, "src", source_src_value);
         attr_dev(source, "type", "audio/wav");
-        add_location(source, file$1, 295, 16, 9880);
+        add_location(source, file$1, 296, 16, 9893);
         attr_dev(audio, "id", "audio");
         audio.controls = "controls";
         attr_dev(audio, "controlslist", "nodownload");
         attr_dev(audio, "class", audio_class_value = ctx.hasTutorial && ctx.tutorialStep === 1 ? "animated flash slow" : "");
-        add_location(audio, file$1, 290, 14, 9664);
+        add_location(audio, file$1, 291, 14, 9677);
         attr_dev(div3, "class", "column is-narrow");
-        add_location(div3, file$1, 289, 12, 9619);
+        add_location(div3, file$1, 290, 12, 9632);
         attr_dev(div4, "class", div4_class_value = ctx.hasTutorial && ctx.tutorialStep === 4 ? "column animated shake delay-2s" : "column");
-        add_location(div4, file$1, 299, 12, 10033);
+        add_location(div4, file$1, 300, 12, 10046);
         attr_dev(div5, "class", "columns is-gapless is-mobile");
-        add_location(div5, file$1, 288, 10, 9564);
+        add_location(div5, file$1, 289, 10, 9577);
         attr_dev(div6, "class", "column is-narrow");
-        add_location(div6, file$1, 287, 8, 9523);
+        add_location(div6, file$1, 288, 8, 9536);
         attr_dev(div7, "class", "column");
-        add_location(div7, file$1, 309, 8, 10432);
+        add_location(div7, file$1, 310, 8, 10445);
         attr_dev(div8, "class", "columns");
-        add_location(div8, file$1, 286, 6, 9493);
+        add_location(div8, file$1, 287, 6, 9506);
         attr_dev(div9, "class", "column is-full");
         attr_dev(div9, "id", "playback-controls-info-column");
-        add_location(div9, file$1, 284, 4, 9345);
+        add_location(div9, file$1, 285, 4, 9358);
         attr_dev(div10, "class", "columns is-centered");
         attr_dev(div10, "id", "row-controls-buttons");
-        add_location(div10, file$1, 283, 2, 9281);
+        add_location(div10, file$1, 284, 2, 9294);
         attr_dev(div11, "class", "container is-fluid svelte-fkpnm1");
         toggle_class(div11, "blur", ctx.hasTutorial && (ctx.tutorialStep === 0 || ctx.quizState === "fail" || ctx.quizState === "readyForExperiment"));
-        add_location(div11, file$1, 261, 0, 8425);
+        add_location(div11, file$1, 262, 0, 8438);
       },
       l: function claim(nodes) {
         throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -44639,6 +44636,7 @@ var app = (function () {
   }
 
   function instance$1($$self, $$props, $$invalidate) {
+    var params = $$props.params;
     var src = $$props.src;
     var _$$props$currentTrial = $$props.currentTrial,
         currentTrial = _$$props$currentTrial === void 0 ? NaN : _$$props$currentTrial;
@@ -44988,7 +44986,7 @@ var app = (function () {
       communicateData("updateSegmentsCount");
     }
 
-    var writable_props = ["src", "currentTrial", "fileName", "tutorialStep", "hasTutorial", "quizAnswers", "quizState"];
+    var writable_props = ["params", "src", "currentTrial", "fileName", "tutorialStep", "hasTutorial", "quizAnswers", "quizState"];
     Object.keys($$props).forEach(function (key) {
       if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1.warn("<ThoughtTagger> was created with unknown prop '".concat(key, "'"));
     });
@@ -45025,6 +45023,7 @@ var app = (function () {
     };
 
     $$self.$set = function ($$props) {
+      if ("params" in $$props) $$invalidate("params", params = $$props.params);
       if ("src" in $$props) $$invalidate("src", src = $$props.src);
       if ("currentTrial" in $$props) $$invalidate("currentTrial", currentTrial = $$props.currentTrial);
       if ("fileName" in $$props) $$invalidate("fileName", fileName = $$props.fileName);
@@ -45036,6 +45035,7 @@ var app = (function () {
 
     $$self.$capture_state = function () {
       return {
+        params: params,
         src: src,
         currentTrial: currentTrial,
         fileName: fileName,
@@ -45067,6 +45067,7 @@ var app = (function () {
     };
 
     $$self.$inject_state = function ($$props) {
+      if ("params" in $$props) $$invalidate("params", params = $$props.params);
       if ("src" in $$props) $$invalidate("src", src = $$props.src);
       if ("currentTrial" in $$props) $$invalidate("currentTrial", currentTrial = $$props.currentTrial);
       if ("fileName" in $$props) $$invalidate("fileName", fileName = $$props.fileName);
@@ -45118,6 +45119,7 @@ var app = (function () {
     };
 
     return {
+      params: params,
       src: src,
       currentTrial: currentTrial,
       fileName: fileName,
@@ -45167,6 +45169,7 @@ var app = (function () {
 
       _this = _possibleConstructorReturn(this, _getPrototypeOf(ThoughtTagger).call(this, options));
       init(_assertThisInitialized(_this), options, instance$1, create_fragment$1, safe_not_equal, {
+        params: 0,
         src: 0,
         currentTrial: 0,
         fileName: 0,
@@ -45184,6 +45187,10 @@ var app = (function () {
       var ctx = _this.$$.ctx;
       var props = options.props || {};
 
+      if (ctx.params === undefined && !("params" in props)) {
+        console_1.warn("<ThoughtTagger> was created without expected prop 'params'");
+      }
+
       if (ctx.src === undefined && !("src" in props)) {
         console_1.warn("<ThoughtTagger> was created without expected prop 'src'");
       }
@@ -45192,6 +45199,14 @@ var app = (function () {
     }
 
     _createClass(ThoughtTagger, [{
+      key: "params",
+      get: function get() {
+        throw new Error("<ThoughtTagger>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      },
+      set: function set(value) {
+        throw new Error("<ThoughtTagger>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+      }
+    }, {
       key: "src",
       get: function get() {
         throw new Error("<ThoughtTagger>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
@@ -45264,9 +45279,9 @@ var app = (function () {
         button = element("button");
         button.textContent = "Submit HIT";
         attr_dev(button, "class", "button is-success is-large");
-        add_location(button, file$2, 160, 10, 4635);
+        add_location(button, file$2, 160, 10, 4627);
         attr_dev(p, "class", "card-footer-item");
-        add_location(p, file$2, 159, 8, 4596);
+        add_location(p, file$2, 159, 8, 4588);
         dispose = listen_dev(button, "click", ctx.click_handler_3, false, false, false);
       },
       m: function mount(target, anchor) {
@@ -45307,13 +45322,13 @@ var app = (function () {
         button1 = element("button");
         button1.textContent = "Do bonus work";
         attr_dev(button0, "class", "button is-warning is-large");
-        add_location(button0, file$2, 149, 10, 4203);
+        add_location(button0, file$2, 149, 10, 4195);
         attr_dev(p0, "class", "card-footer-item");
-        add_location(p0, file$2, 148, 8, 4164);
+        add_location(p0, file$2, 148, 8, 4156);
         attr_dev(button1, "class", "button is-success is-large");
-        add_location(button1, file$2, 154, 10, 4401);
+        add_location(button1, file$2, 154, 10, 4393);
         attr_dev(p1, "class", "card-footer-item");
-        add_location(p1, file$2, 153, 8, 4362);
+        add_location(p1, file$2, 153, 8, 4354);
         dispose = [listen_dev(button0, "click", ctx.click_handler_1, false, false, false), listen_dev(button1, "click", ctx.click_handler_2, false, false, false)];
       },
       m: function mount(target, anchor) {
@@ -45368,15 +45383,15 @@ var app = (function () {
         p1 = element("p");
         if (if_block) if_block.c();
         attr_dev(i, "class", "fas fa-backward");
-        add_location(i, file$2, 126, 14, 3451);
+        add_location(i, file$2, 126, 14, 3443);
         attr_dev(span, "class", "icon");
-        add_location(span, file$2, 125, 12, 3417);
+        add_location(span, file$2, 125, 12, 3409);
         attr_dev(button, "class", "button is-link controls svelte-1q3lzhq");
-        add_location(button, file$2, 124, 10, 3344);
+        add_location(button, file$2, 124, 10, 3336);
         attr_dev(p0, "class", "card-footer-item");
-        add_location(p0, file$2, 123, 8, 3305);
+        add_location(p0, file$2, 123, 8, 3297);
         attr_dev(p1, "class", "card-footer-item");
-        add_location(p1, file$2, 130, 8, 3542);
+        add_location(p1, file$2, 130, 8, 3534);
         dispose = listen_dev(button, "click", ctx.backward, false, false, false);
       },
       m: function mount(target, anchor) {
@@ -45435,11 +45450,11 @@ var app = (function () {
         span = element("span");
         i = element("i");
         attr_dev(i, "class", "fas fa-forward");
-        add_location(i, file$2, 142, 16, 4002);
+        add_location(i, file$2, 142, 16, 3994);
         attr_dev(span, "class", "icon");
-        add_location(span, file$2, 141, 14, 3966);
+        add_location(span, file$2, 141, 14, 3958);
         attr_dev(button, "class", "button is-link controls svelte-1q3lzhq");
-        add_location(button, file$2, 140, 12, 3892);
+        add_location(button, file$2, 140, 12, 3884);
         dispose = listen_dev(button, "click", ctx.forward, false, false, false);
       },
       m: function mount(target, anchor) {
@@ -45472,7 +45487,7 @@ var app = (function () {
         button = element("button");
         button.textContent = "Hide Help";
         attr_dev(button, "class", "button is-link");
-        add_location(button, file$2, 132, 12, 3636);
+        add_location(button, file$2, 132, 12, 3628);
         dispose = listen_dev(button, "click", ctx.click_handler, false, false, false);
       },
       m: function mount(target, anchor) {
@@ -45528,22 +45543,22 @@ var app = (function () {
         footer = element("footer");
         if (if_block) if_block.c();
         attr_dev(p, "class", "modal-card-title");
-        add_location(p, file$2, 116, 6, 3091);
+        add_location(p, file$2, 116, 6, 3083);
         attr_dev(header, "class", "modal-card-head");
-        add_location(header, file$2, 115, 4, 3052);
+        add_location(header, file$2, 115, 4, 3044);
         attr_dev(section, "class", "modal-card-body");
-        add_location(section, file$2, 118, 4, 3154);
+        add_location(section, file$2, 118, 4, 3146);
         attr_dev(footer, "class", "modal-card-foot");
-        add_location(footer, file$2, 121, 4, 3234);
+        add_location(footer, file$2, 121, 4, 3226);
         attr_dev(div0, "class", "modal-card svelte-1q3lzhq");
         attr_dev(div0, "id", "modal");
         toggle_class(div0, "up", ctx.up);
         toggle_class(div0, "right", ctx.right);
         toggle_class(div0, "down", ctx.down);
         toggle_class(div0, "upp", ctx.upp);
-        add_location(div0, file$2, 114, 2, 2970);
+        add_location(div0, file$2, 114, 2, 2962);
         attr_dev(div1, "class", div1_class_value = "" + (null_to_empty(ctx.modalOpen ? "modal is-active" : "modal") + " svelte-1q3lzhq"));
-        add_location(div1, file$2, 109, 0, 2795);
+        add_location(div1, file$2, 109, 0, 2787);
         dispose = [listen_dev(div1, "mousedown", prevent_default(ctx.dragStart), false, false, true), listen_dev(div1, "mouseup", prevent_default(ctx.dragEnd), false, false, true), listen_dev(div1, "mousemove", prevent_default(ctx.drag), false, false, true)];
       },
       l: function claim(nodes) {
@@ -46340,7 +46355,7 @@ var app = (function () {
       state: "overview"
     }, {
       title: "Recording Display",
-      content: "<p>This part of the screen creen contains a visual representation of the audio recording. The top half of this display (in green) shows a zoomed in view of an <strong>audio snippet</strong> of the recording, while the bottom half displays the <strong>full recording</strong> along with a box highlighting the <strong>location of the snippet</strong> within the full recording. Below this are playback controls you can use to play, pause, and adjust the volume of the recording. Playback is synchronized between these controls and the visual display.</p><br><p>You can move to a specific location within the snippet or within the full recording by <strong>clicking</strong> in the top or bottom display respectively. This will move the vertical position indicator to a new timepoint in both displays. You can also scrub through the snippet or full recording by <strong>clicking & dragging</strong> left or right.</p><br/><p>Feel free to click around within this display to get a feel for how you can control your position within the recording. Next to the audio controls is a help button that will show or hide this guide.</p>",
+      content: "<p>This part of the screen contains a visual representation of the audio recording. The top half of this display (in green) shows a zoomed in view of an <strong>audio snippet</strong> of the recording, while the bottom half displays the <strong>full recording</strong> along with a box highlighting the <strong>location of the snippet</strong> within the full recording. Below this are playback controls you can use to play, pause, and adjust the volume of the recording. Playback is synchronized between these controls and the visual display.</p><br><p>You can move to a specific location within the snippet or within the full recording by <strong>clicking</strong> in the top or bottom display respectively. This will move the vertical position indicator to a new timepoint in both displays. You can also scrub through the snippet or full recording by <strong>clicking & dragging</strong> left or right.</p><br/><p>Feel free to click around within this display to get a feel for how you can control your position within the recording. Next to the audio controls is a help button that will show or hide this guide.</p>",
       state: "recording"
     }, {
       title: "Controls",
@@ -46575,6 +46590,7 @@ var app = (function () {
     var current;
     var thoughttagger = new ThoughtTagger({
       props: {
+        params: params,
         src: ctx.src,
         currentTrial: ctx.currentTrial,
         fileName: ctx.fileName

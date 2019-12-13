@@ -1,7 +1,7 @@
 <script>
   // This is the main experiment page. It takes as input trialOrder, which gets passed in from App.svelte, which itself gets it from firebase. Then it looks at the current trial number the participant is on, gets the audio file URL and passes that info as parameters to the TagThought component.
   import { createEventDispatcher } from 'svelte';
-  import { db, storage, params } from '../utils.js';
+  import { db, params, storage } from '../utils.js';
   import ThoughtTagger from '../components/ThoughtTagger.svelte';
   import Loading from '../components/Loading.svelte';
 
@@ -37,7 +37,8 @@
     }
   })();
 
-  // Function to try to get the next trial's audio file or tell App.svelte to the experiment
+  // Function to try to get the next trial's audio file or tell App.svelte to end the experiment
+  // TODO: within this function update the count for this particular audio file in the recordings collection
   const getNextAudioFile = () => {
     if (currentTrial === trialOrder.length) {
       dispatch('finished');
@@ -51,5 +52,5 @@
 {#await filePromise}
   <Loading>Preparing Recording...</Loading>
 {:then src}
-  <ThoughtTagger {src} {currentTrial} {fileName} on:next={getNextAudioFile} />
+  <ThoughtTagger {params} {src} {currentTrial} {fileName} on:next={getNextAudioFile} />
 {/await}

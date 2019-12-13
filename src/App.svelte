@@ -1,7 +1,7 @@
 <script>
   // This is the main Svelte component that will display after a user provides conset within PsiTurk. It serves two main purposes: 1) it initializes a new entry into the firebase database if a workerId from the URL is not found or retrieves an existing record if a workerId is found. Creating a new entry sets up the random trial order the participant will receive for all the recordings. 2) it uses that information to dynamically render different experiment states based upon what a user does i.e. show instructions, show quiz, show experiment, show exit survey. Each of those different states exist as their own .svelte files within the pages/ folder
   import { onMount } from 'svelte';
-  import { db, auth, params, fisherYatesShuffle, serverTime } from './utils.js';
+  import { db, auth, fisherYatesShuffle, serverTime, params } from './utils.js';
   import Instructions from './pages/Instructions.svelte';
   import Quiz from './pages/Quiz.svelte';
   import Experiment from './pages/Experiment.svelte';
@@ -29,6 +29,7 @@
   };
 
   // Before we render anything see if we have a db entry for this subject based upon the URL parameters. If not create an entry with a new random stimulus order and put them into the instructions state. If we do, load their trial order and current experiment state
+  // TODO: Get all audio file names from database sorted by count and shuffle order of those with the same count to make sure multiple users dont do the same audio file when we first start running experiment
   onMount(async () => {
     try {
       auth.onAuthStateChanged(async (user) => {

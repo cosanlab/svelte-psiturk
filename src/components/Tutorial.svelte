@@ -1,7 +1,7 @@
 <script>
   // This is the main ThoughTagging component that gets rendered within Experiment.svelte. It takes as an "argument" a "src" value from Experiment.svelte that tells it which audo file to render
   import { createEventDispatcher } from 'svelte';
-  import { db, params, serverTime } from '../utils.js';
+  import { db, serverTime } from '../utils.js';
 
   // Input variables
   export let modalOpen;

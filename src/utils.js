@@ -24,7 +24,7 @@ export const serverTime = firebase.database.ServerValue.TIMESTAMP;
 
 // Functions to parse the URL to get workerID, hitID, and assignmentID
 const unescapeURL = (s) => decodeURIComponent(s.replace(/\+/g, '%20'));
-const getURLParams = () => {
+export const getURLParams = () => {
   const params = {};
   const m = window.location.href.match(/[\\?&]([^=]+)=([^&#]*)/g);
   if (m) {
@@ -36,6 +36,8 @@ const getURLParams = () => {
     }
   }
   if (!params.workerId && !params.assignmentId && !params.hitId) {
+    console.log('Referring URL is NOT psiTurk....creating fake workerId');
+    console.log('MAKE SURE TO REMOVE THIS IN CODE BEFORE GOING LIVE');
     params.workerId = 'test-worker';
     params.assignmentId = 'test-assignment';
     params.hitId = 'test-hit';
