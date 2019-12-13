@@ -274,7 +274,10 @@
         <h3 class="title is-3">Loading audio...</h3>
         <button class="button is-white is-loading loading-button" disabled />
       {/if}
-      <div id="waveform-container" class:blur={hasTutorial && tutorialStep < 1} />
+      <div
+        id="waveform-container"
+        class:blur={hasTutorial && tutorialStep < 1}
+        class={hasTutorial && tutorialStep === 1 ? 'animated flash slow' : ''} />
     </div>
   </div>
   <!-- Controls + Button row -->
@@ -285,12 +288,17 @@
         <div class="column is-narrow">
           <div class="columns is-gapless is-mobile">
             <div class="column is-narrow">
-              <audio id="audio" controls="controls" controlslist="nodownload">
+              <audio
+                id="audio"
+                controls="controls"
+                controlslist="nodownload"
+                class={hasTutorial && tutorialStep === 1 ? 'animated flash slow' : ''}>
                 <source {src} type="audio/wav" />
                 Your browser does not support the audio element.
               </audio>
             </div>
-            <div class="column">
+            <div
+              class={hasTutorial && tutorialStep === 4 ? 'column animated shake delay-2s' : 'column'}>
               {#if hasTutorial}
                 <span class="icon is-large" on:click={() => dispatch('toggleTutorial')}>
                   <i class="fas fa-question-circle fa-2x fa-fw" />
@@ -301,7 +309,10 @@
         </div>
         <div class="column">
           {#if rate}
-            <button class="button is-primary is-large" on:click={finish} disabled={nextTrialActive}>
+            <button
+              class={hasTutorial ? 'button is-primary is-large animated flash delay-1s' : 'button is-primary is-large'}
+              on:click={finish}
+              disabled={nextTrialActive}>
               Next
             </button>
           {:else}
@@ -310,7 +321,7 @@
                 <div class="columns button-row">
                   <div class="column button-col">
                     <button
-                      class="button is-primary is-large"
+                      class={hasTutorial && tutorialStep === 2 ? 'button is-primary is-large animated flash delay-1s' : 'button is-primary is-large'}
                       class:blur={hasTutorial && tutorialStep < 2}
                       on:click={addSegment}>
                       Tag

@@ -43655,7 +43655,7 @@ var app = (function () {
       ctx: ctx
     });
     return block;
-  } // (294:14) {#if hasTutorial}
+  } // (302:14) {#if hasTutorial}
 
 
   function create_if_block_4(ctx) {
@@ -43667,9 +43667,9 @@ var app = (function () {
         span = element("span");
         i = element("i");
         attr_dev(i, "class", "fas fa-question-circle fa-2x fa-fw");
-        add_location(i, file$1, 295, 18, 9963);
+        add_location(i, file$1, 303, 18, 10280);
         attr_dev(span, "class", "icon is-large");
-        add_location(span, file$1, 294, 16, 9872);
+        add_location(span, file$1, 302, 16, 10189);
         dispose = listen_dev(span, "click", ctx.click_handler, false, false, false);
       },
       m: function mount(target, anchor) {
@@ -43686,11 +43686,11 @@ var app = (function () {
       block: block,
       id: create_if_block_4.name,
       type: "if",
-      source: "(294:14) {#if hasTutorial}",
+      source: "(302:14) {#if hasTutorial}",
       ctx: ctx
     });
     return block;
-  } // (307:10) {:else}
+  } // (318:10) {:else}
 
 
   function create_else_block_2(ctx) {
@@ -43699,6 +43699,8 @@ var app = (function () {
     var div1;
     var div0;
     var button0;
+    var t0;
+    var button0_class_value;
     var t1;
     var button1;
     var t2;
@@ -43719,7 +43721,7 @@ var app = (function () {
         div1 = element("div");
         div0 = element("div");
         button0 = element("button");
-        button0.textContent = "Tag";
+        t0 = text("Tag");
         t1 = space();
         button1 = element("button");
         t2 = text("Done");
@@ -43735,36 +43737,36 @@ var app = (function () {
         t7 = space();
         button3 = element("button");
         button3.textContent = "Delete";
-        attr_dev(button0, "class", "button is-primary is-large svelte-fkpnm1");
+        attr_dev(button0, "class", button0_class_value = "" + (null_to_empty(ctx.hasTutorial && ctx.tutorialStep === 2 ? "button is-primary is-large animated flash delay-1s" : "button is-primary is-large") + " svelte-fkpnm1"));
         toggle_class(button0, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
-        add_location(button0, file$1, 311, 20, 10526);
+        add_location(button0, file$1, 322, 20, 10956);
         attr_dev(button1, "class", "button is-info is-large svelte-fkpnm1");
         button1.disabled = ctx.ratingActive;
         toggle_class(button1, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
-        add_location(button1, file$1, 317, 20, 10779);
+        add_location(button1, file$1, 328, 20, 11302);
         attr_dev(div0, "class", "column button-col svelte-fkpnm1");
-        add_location(div0, file$1, 310, 18, 10474);
+        add_location(div0, file$1, 321, 18, 10904);
         attr_dev(div1, "class", "columns button-row svelte-fkpnm1");
-        add_location(div1, file$1, 309, 16, 10423);
+        add_location(div1, file$1, 320, 16, 10853);
         attr_dev(p, "class", "is-size-7");
         toggle_class(p, "is-invisible", ctx.segments.length === 0);
-        add_location(p, file$1, 328, 20, 11201);
+        add_location(p, file$1, 339, 20, 11724);
         attr_dev(div2, "class", "column");
-        add_location(div2, file$1, 327, 18, 11160);
+        add_location(div2, file$1, 338, 18, 11683);
         attr_dev(div3, "class", "columns");
-        add_location(div3, file$1, 326, 16, 11120);
+        add_location(div3, file$1, 337, 16, 11643);
         attr_dev(div4, "class", "column is-narrow");
-        add_location(div4, file$1, 308, 14, 10376);
+        add_location(div4, file$1, 319, 14, 10806);
         attr_dev(button2, "class", "button is-success is-large");
         toggle_class(button2, "is-invisible", !ctx.rowSelected);
-        add_location(button2, file$1, 335, 16, 11470);
+        add_location(button2, file$1, 346, 16, 11993);
         attr_dev(button3, "class", "button is-danger is-large");
         toggle_class(button3, "is-invisible", !ctx.rowSelected);
-        add_location(button3, file$1, 341, 16, 11690);
+        add_location(button3, file$1, 352, 16, 12213);
         attr_dev(div5, "class", "column");
-        add_location(div5, file$1, 334, 14, 11433);
+        add_location(div5, file$1, 345, 14, 11956);
         attr_dev(div6, "class", "columns is-gapless");
-        add_location(div6, file$1, 307, 12, 10329);
+        add_location(div6, file$1, 318, 12, 10759);
         dispose = [listen_dev(button0, "click", ctx.addSegment, false, false, false), listen_dev(button1, "click", ctx.submitTags, false, false, false), listen_dev(button2, "click", ctx.playSegment, false, false, false), listen_dev(button3, "click", ctx.deleteSegment, false, false, false)];
       },
       m: function mount(target, anchor) {
@@ -43773,6 +43775,7 @@ var app = (function () {
         append_dev(div4, div1);
         append_dev(div1, div0);
         append_dev(div0, button0);
+        append_dev(button0, t0);
         append_dev(div0, t1);
         append_dev(div0, button1);
         append_dev(button1, t2);
@@ -43787,7 +43790,11 @@ var app = (function () {
         append_dev(div5, button3);
       },
       p: function update(changed, ctx) {
-        if (changed.hasTutorial || changed.tutorialStep) {
+        if ((changed.hasTutorial || changed.tutorialStep) && button0_class_value !== (button0_class_value = "" + (null_to_empty(ctx.hasTutorial && ctx.tutorialStep === 2 ? "button is-primary is-large animated flash delay-1s" : "button is-primary is-large") + " svelte-fkpnm1"))) {
+          attr_dev(button0, "class", button0_class_value);
+        }
+
+        if (changed.hasTutorial || changed.tutorialStep || changed.hasTutorial || changed.tutorialStep) {
           toggle_class(button0, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
         }
 
@@ -43820,24 +43827,25 @@ var app = (function () {
       block: block,
       id: create_else_block_2.name,
       type: "else",
-      source: "(307:10) {:else}",
+      source: "(318:10) {:else}",
       ctx: ctx
     });
     return block;
-  } // (303:10) {#if rate}
+  } // (311:10) {#if rate}
 
 
   function create_if_block_3(ctx) {
     var button;
     var t;
+    var button_class_value;
     var dispose;
     var block = {
       c: function create() {
         button = element("button");
         t = text("Next");
-        attr_dev(button, "class", "button is-primary is-large");
+        attr_dev(button, "class", button_class_value = ctx.hasTutorial ? "button is-primary is-large animated flash delay-1s" : "button is-primary is-large");
         button.disabled = ctx.nextTrialActive;
-        add_location(button, file$1, 303, 12, 10169);
+        add_location(button, file$1, 311, 12, 10486);
         dispose = listen_dev(button, "click", ctx.finish, false, false, false);
       },
       m: function mount(target, anchor) {
@@ -43845,6 +43853,10 @@ var app = (function () {
         append_dev(button, t);
       },
       p: function update(changed, ctx) {
+        if (changed.hasTutorial && button_class_value !== (button_class_value = ctx.hasTutorial ? "button is-primary is-large animated flash delay-1s" : "button is-primary is-large")) {
+          attr_dev(button, "class", button_class_value);
+        }
+
         if (changed.nextTrialActive) {
           prop_dev(button, "disabled", ctx.nextTrialActive);
         }
@@ -43858,11 +43870,11 @@ var app = (function () {
       block: block,
       id: create_if_block_3.name,
       type: "if",
-      source: "(303:10) {#if rate}",
+      source: "(311:10) {#if rate}",
       ctx: ctx
     });
     return block;
-  } // (413:2) {:else}
+  } // (424:2) {:else}
 
 
   function create_else_block$1(ctx) {
@@ -43882,10 +43894,10 @@ var app = (function () {
         div0 = element("div");
         if_block.c();
         attr_dev(div0, "class", "column is-full has-text-centered");
-        add_location(div0, file$1, 415, 6, 14317);
+        add_location(div0, file$1, 426, 6, 14840);
         attr_dev(div1, "class", "columns is-centered svelte-fkpnm1");
         toggle_class(div1, "blur", ctx.hasTutorial && ctx.tutorialStep < 2);
-        add_location(div1, file$1, 414, 4, 14232);
+        add_location(div1, file$1, 425, 4, 14755);
       },
       m: function mount(target, anchor) {
         insert_dev(target, div1, anchor);
@@ -43918,11 +43930,11 @@ var app = (function () {
       block: block,
       id: create_else_block$1.name,
       type: "else",
-      source: "(413:2) {:else}",
+      source: "(424:2) {:else}",
       ctx: ctx
     });
     return block;
-  } // (355:2) {#if rate}
+  } // (366:2) {#if rate}
 
 
   function create_if_block$1(ctx) {
@@ -44004,57 +44016,57 @@ var app = (function () {
         p5 = element("p");
         p5.textContent = "Effortless";
         attr_dev(label, "class", "label has-text-weight-normal is-size-5");
-        add_location(label, file$1, 359, 10, 12199);
+        add_location(label, file$1, 370, 10, 12722);
         attr_dev(input0, "class", input0_class_value = ctx.invalidTime ? "input age-input is-danger" : "input age-input");
         attr_dev(input0, "type", "text");
         attr_dev(input0, "placeholder", "Please enter a timestamp like MM:SS");
-        add_location(input0, file$1, 363, 12, 12364);
+        add_location(input0, file$1, 374, 12, 12887);
         attr_dev(div0, "class", "control");
-        add_location(div0, file$1, 362, 10, 12330);
+        add_location(div0, file$1, 373, 10, 12853);
         attr_dev(div1, "class", "field");
-        add_location(div1, file$1, 358, 8, 12169);
+        add_location(div1, file$1, 369, 8, 12692);
         attr_dev(div2, "class", "column is-narrow has-text-centered");
-        add_location(div2, file$1, 357, 6, 12112);
+        add_location(div2, file$1, 368, 6, 12635);
         attr_dev(p0, "class", "has-text-centered is-size-5");
-        add_location(p0, file$1, 376, 8, 12892);
+        add_location(p0, file$1, 387, 8, 13415);
         attr_dev(input1, "step", "1");
         attr_dev(input1, "min", "0");
         attr_dev(input1, "max", "100");
         attr_dev(input1, "type", "range");
-        add_location(input1, file$1, 377, 8, 12987);
+        add_location(input1, file$1, 388, 8, 13510);
         attr_dev(p1, "class", "subtitle is-size-6");
-        add_location(p1, file$1, 386, 12, 13271);
+        add_location(p1, file$1, 397, 12, 13794);
         attr_dev(div3, "class", "column has-text-left");
-        add_location(div3, file$1, 385, 10, 13224);
+        add_location(div3, file$1, 396, 10, 13747);
         attr_dev(p2, "class", "subtitle is-size-6");
-        add_location(p2, file$1, 389, 12, 13396);
+        add_location(p2, file$1, 400, 12, 13919);
         attr_dev(div4, "class", "column has-text-right");
-        add_location(div4, file$1, 388, 10, 13348);
+        add_location(div4, file$1, 399, 10, 13871);
         attr_dev(div5, "class", "columns is-mobile is-centered");
-        add_location(div5, file$1, 384, 8, 13170);
+        add_location(div5, file$1, 395, 8, 13693);
         attr_dev(div6, "class", "column is-4-desktop is-3-fullhd has-text-centered");
-        add_location(div6, file$1, 375, 6, 12820);
+        add_location(div6, file$1, 386, 6, 13343);
         attr_dev(p3, "class", "has-text-centered is-size-5");
-        add_location(p3, file$1, 394, 8, 13561);
+        add_location(p3, file$1, 405, 8, 14084);
         attr_dev(input2, "step", "1");
         attr_dev(input2, "min", "0");
         attr_dev(input2, "max", "100");
         attr_dev(input2, "type", "range");
-        add_location(input2, file$1, 395, 8, 13655);
+        add_location(input2, file$1, 406, 8, 14178);
         attr_dev(p4, "class", "subtitle is-size-6");
-        add_location(p4, file$1, 404, 12, 13945);
+        add_location(p4, file$1, 415, 12, 14468);
         attr_dev(div7, "class", "column has-text-left");
-        add_location(div7, file$1, 403, 10, 13898);
+        add_location(div7, file$1, 414, 10, 14421);
         attr_dev(p5, "class", "subtitle is-size-6");
-        add_location(p5, file$1, 407, 12, 14065);
+        add_location(p5, file$1, 418, 12, 14588);
         attr_dev(div8, "class", "column has-text-right");
-        add_location(div8, file$1, 406, 10, 14017);
+        add_location(div8, file$1, 417, 10, 14540);
         attr_dev(div9, "class", "columns is-mobile is-centered");
-        add_location(div9, file$1, 402, 8, 13844);
+        add_location(div9, file$1, 413, 8, 14367);
         attr_dev(div10, "class", "column is-4-desktop is-3-fullhd has-text-centered");
-        add_location(div10, file$1, 393, 6, 13489);
+        add_location(div10, file$1, 404, 6, 14012);
         attr_dev(div11, "class", "columns is-centered");
-        add_location(div11, file$1, 356, 4, 12072);
+        add_location(div11, file$1, 367, 4, 12595);
         dispose = [listen_dev(input0, "input", ctx.input0_input_handler), listen_dev(input0, "keyup", ctx.keyup_handler, false, false, false), listen_dev(input1, "change", ctx.input1_change_input_handler), listen_dev(input1, "input", ctx.input1_change_input_handler), listen_dev(input1, "click", ctx.click_handler_1, {
           once: true
         }, false, false), listen_dev(input2, "change", ctx.input2_change_input_handler), listen_dev(input2, "input", ctx.input2_change_input_handler), listen_dev(input2, "click", ctx.click_handler_2, {
@@ -44137,11 +44149,11 @@ var app = (function () {
       block: block,
       id: create_if_block$1.name,
       type: "if",
-      source: "(355:2) {#if rate}",
+      source: "(366:2) {#if rate}",
       ctx: ctx
     });
     return block;
-  } // (438:8) {:else}
+  } // (449:8) {:else}
 
 
   function create_else_block_1(ctx) {
@@ -44151,7 +44163,7 @@ var app = (function () {
         h2 = element("h2");
         h2.textContent = "No Thoughts Tagged";
         attr_dev(h2, "class", "title is-4");
-        add_location(h2, file$1, 438, 10, 15223);
+        add_location(h2, file$1, 449, 10, 15746);
       },
       m: function mount(target, anchor) {
         insert_dev(target, h2, anchor);
@@ -44165,11 +44177,11 @@ var app = (function () {
       block: block,
       id: create_else_block_1.name,
       type: "else",
-      source: "(438:8) {:else}",
+      source: "(449:8) {:else}",
       ctx: ctx
     });
     return block;
-  } // (417:8) {#if segments && segments.length}
+  } // (428:8) {#if segments && segments.length}
 
 
   function create_if_block_2(ctx) {
@@ -44219,16 +44231,16 @@ var app = (function () {
           each_blocks[_i].c();
         }
 
-        add_location(th0, file$1, 421, 18, 14554);
-        add_location(th1, file$1, 422, 18, 14596);
-        add_location(th2, file$1, 423, 18, 14634);
-        add_location(tr, file$1, 420, 16, 14531);
-        add_location(thead, file$1, 419, 14, 14507);
-        add_location(tbody, file$1, 426, 14, 14711);
+        add_location(th0, file$1, 432, 18, 15077);
+        add_location(th1, file$1, 433, 18, 15119);
+        add_location(th2, file$1, 434, 18, 15157);
+        add_location(tr, file$1, 431, 16, 15054);
+        add_location(thead, file$1, 430, 14, 15030);
+        add_location(tbody, file$1, 437, 14, 15234);
         attr_dev(table, "class", "table is-hoverable svelte-fkpnm1");
-        add_location(table, file$1, 418, 12, 14458);
+        add_location(table, file$1, 429, 12, 14981);
         attr_dev(div, "class", "table-container");
-        add_location(div, file$1, 417, 10, 14416);
+        add_location(div, file$1, 428, 10, 14939);
       },
       m: function mount(target, anchor) {
         insert_dev(target, div, anchor);
@@ -44263,11 +44275,11 @@ var app = (function () {
       block: block,
       id: create_if_block_2.name,
       type: "if",
-      source: "(417:8) {#if segments && segments.length}",
+      source: "(428:8) {#if segments && segments.length}",
       ctx: ctx
     });
     return block;
-  } // (428:16) {#each segments as segment, i (segment.id)}
+  } // (439:16) {#each segments as segment, i (segment.id)}
 
 
   function create_each_block(key_1, ctx) {
@@ -44301,13 +44313,13 @@ var app = (function () {
         t5 = space();
         attr_dev(td0, "type", "text");
         attr_dev(td0, "class", "segment-id");
-        add_location(td0, file$1, 429, 20, 14865);
+        add_location(td0, file$1, 440, 20, 15388);
         attr_dev(td1, "type", "number");
-        add_location(td1, file$1, 430, 20, 14962);
+        add_location(td1, file$1, 441, 20, 15485);
         attr_dev(td2, "type", "number");
-        add_location(td2, file$1, 431, 20, 15036);
+        add_location(td2, file$1, 442, 20, 15559);
         attr_dev(tr, "class", "table-row");
-        add_location(tr, file$1, 428, 18, 14797);
+        add_location(tr, file$1, 439, 18, 15320);
         dispose = listen_dev(tr, "click", ctx.selectSegment, false, false, false);
         this.first = tr;
       },
@@ -44337,11 +44349,11 @@ var app = (function () {
       block: block,
       id: create_each_block.name,
       type: "each",
-      source: "(428:16) {#each segments as segment, i (segment.id)}",
+      source: "(439:16) {#each segments as segment, i (segment.id)}",
       ctx: ctx
     });
     return block;
-  } // (371:10) {#if invalidTime}
+  } // (382:10) {#if invalidTime}
 
 
   function create_if_block_1(ctx) {
@@ -44351,7 +44363,7 @@ var app = (function () {
         p = element("p");
         p.textContent = "Invalid timestamp. Please use MM:SS format.";
         attr_dev(p, "class", "help is-danger");
-        add_location(p, file$1, 371, 12, 12696);
+        add_location(p, file$1, 382, 12, 13219);
       },
       m: function mount(target, anchor) {
         insert_dev(target, p, anchor);
@@ -44364,7 +44376,7 @@ var app = (function () {
       block: block,
       id: create_if_block_1.name,
       type: "if",
-      source: "(371:10) {#if invalidTime}",
+      source: "(382:10) {#if invalidTime}",
       ctx: ctx
     });
     return block;
@@ -44377,6 +44389,7 @@ var app = (function () {
     var t0;
     var t1;
     var div0;
+    var div0_class_value;
     var t2;
     var div10;
     var div9;
@@ -44388,8 +44401,10 @@ var app = (function () {
     var source;
     var source_src_value;
     var t3;
+    var audio_class_value;
     var t4;
     var div4;
+    var div4_class_value;
     var t5;
     var div7;
     var t6;
@@ -44448,7 +44463,7 @@ var app = (function () {
         t6 = space();
         if_block4.c();
         attr_dev(div0, "id", "waveform-container");
-        attr_dev(div0, "class", "svelte-fkpnm1");
+        attr_dev(div0, "class", div0_class_value = "" + (null_to_empty(ctx.hasTutorial && ctx.tutorialStep === 1 ? "animated flash slow" : "") + " svelte-fkpnm1"));
         toggle_class(div0, "blur", ctx.hasTutorial && ctx.tutorialStep < 1);
         add_location(div0, file$1, 276, 6, 9054);
         attr_dev(div1, "class", "column is-full has-text-centered");
@@ -44458,29 +44473,30 @@ var app = (function () {
         add_location(div2, file$1, 265, 2, 8615);
         if (source.src !== (source_src_value = ctx.src)) attr_dev(source, "src", source_src_value);
         attr_dev(source, "type", "audio/wav");
-        add_location(source, file$1, 288, 16, 9650);
+        add_location(source, file$1, 295, 16, 9880);
         attr_dev(audio, "id", "audio");
         audio.controls = "controls";
         attr_dev(audio, "controlslist", "nodownload");
-        add_location(audio, file$1, 287, 14, 9569);
+        attr_dev(audio, "class", audio_class_value = ctx.hasTutorial && ctx.tutorialStep === 1 ? "animated flash slow" : "");
+        add_location(audio, file$1, 290, 14, 9664);
         attr_dev(div3, "class", "column is-narrow");
-        add_location(div3, file$1, 286, 12, 9524);
-        attr_dev(div4, "class", "column");
-        add_location(div4, file$1, 292, 12, 9803);
+        add_location(div3, file$1, 289, 12, 9619);
+        attr_dev(div4, "class", div4_class_value = ctx.hasTutorial && ctx.tutorialStep === 4 ? "column animated shake delay-2s" : "column");
+        add_location(div4, file$1, 299, 12, 10033);
         attr_dev(div5, "class", "columns is-gapless is-mobile");
-        add_location(div5, file$1, 285, 10, 9469);
+        add_location(div5, file$1, 288, 10, 9564);
         attr_dev(div6, "class", "column is-narrow");
-        add_location(div6, file$1, 284, 8, 9428);
+        add_location(div6, file$1, 287, 8, 9523);
         attr_dev(div7, "class", "column");
-        add_location(div7, file$1, 301, 8, 10115);
+        add_location(div7, file$1, 309, 8, 10432);
         attr_dev(div8, "class", "columns");
-        add_location(div8, file$1, 283, 6, 9398);
+        add_location(div8, file$1, 286, 6, 9493);
         attr_dev(div9, "class", "column is-full");
         attr_dev(div9, "id", "playback-controls-info-column");
-        add_location(div9, file$1, 281, 4, 9250);
+        add_location(div9, file$1, 284, 4, 9345);
         attr_dev(div10, "class", "columns is-centered");
         attr_dev(div10, "id", "row-controls-buttons");
-        add_location(div10, file$1, 280, 2, 9186);
+        add_location(div10, file$1, 283, 2, 9281);
         attr_dev(div11, "class", "container is-fluid svelte-fkpnm1");
         toggle_class(div11, "blur", ctx.hasTutorial && (ctx.tutorialStep === 0 || ctx.quizState === "fail" || ctx.quizState === "readyForExperiment"));
         add_location(div11, file$1, 261, 0, 8425);
@@ -44540,12 +44556,20 @@ var app = (function () {
           if_block1 = null;
         }
 
-        if (changed.hasTutorial || changed.tutorialStep) {
+        if ((changed.hasTutorial || changed.tutorialStep) && div0_class_value !== (div0_class_value = "" + (null_to_empty(ctx.hasTutorial && ctx.tutorialStep === 1 ? "animated flash slow" : "") + " svelte-fkpnm1"))) {
+          attr_dev(div0, "class", div0_class_value);
+        }
+
+        if (changed.hasTutorial || changed.tutorialStep || changed.hasTutorial || changed.tutorialStep) {
           toggle_class(div0, "blur", ctx.hasTutorial && ctx.tutorialStep < 1);
         }
 
         if (changed.src && source.src !== (source_src_value = ctx.src)) {
           attr_dev(source, "src", source_src_value);
+        }
+
+        if ((changed.hasTutorial || changed.tutorialStep) && audio_class_value !== (audio_class_value = ctx.hasTutorial && ctx.tutorialStep === 1 ? "animated flash slow" : "")) {
+          attr_dev(audio, "class", audio_class_value);
         }
 
         if (ctx.hasTutorial) {
@@ -44559,6 +44583,10 @@ var app = (function () {
         } else if (if_block2) {
           if_block2.d(1);
           if_block2 = null;
+        }
+
+        if ((changed.hasTutorial || changed.tutorialStep) && div4_class_value !== (div4_class_value = ctx.hasTutorial && ctx.tutorialStep === 4 ? "column animated shake delay-2s" : "column")) {
+          attr_dev(div4, "class", div4_class_value);
         }
 
         if (current_block_type_1 === (current_block_type_1 = select_block_type_1(changed, ctx)) && if_block3) {
@@ -46064,7 +46092,7 @@ var app = (function () {
       ctx: ctx
     });
     return block;
-  } // (163:0) {:then src}
+  } // (168:0) {:then src}
 
 
   function create_then_block(ctx) {
@@ -46146,11 +46174,11 @@ var app = (function () {
       block: block,
       id: create_then_block.name,
       type: "then",
-      source: "(163:0) {:then src}",
+      source: "(168:0) {:then src}",
       ctx: ctx
     });
     return block;
-  } // (161:18)    <Loading>Loading...</Loading> {:then src}
+  } // (166:18)    <Loading>Loading...</Loading> {:then src}
 
 
   function create_pending_block(ctx) {
@@ -46203,11 +46231,11 @@ var app = (function () {
       block: block,
       id: create_pending_block.name,
       type: "pending",
-      source: "(161:18)    <Loading>Loading...</Loading> {:then src}",
+      source: "(166:18)    <Loading>Loading...</Loading> {:then src}",
       ctx: ctx
     });
     return block;
-  } // (162:2) <Loading>
+  } // (167:2) <Loading>
 
 
   function create_default_slot(ctx) {
@@ -46227,7 +46255,7 @@ var app = (function () {
       block: block,
       id: create_default_slot.name,
       type: "slot",
-      source: "(162:2) <Loading>",
+      source: "(167:2) <Loading>",
       ctx: ctx
     });
     return block;
