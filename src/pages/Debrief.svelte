@@ -5,11 +5,29 @@
   let age = '';
   let feedback = '';
   let sex = '';
+  let ethnicity = '';
+  let race = [];
+  const raceOptions = [
+    'Asian / Asian-American',
+    'Black / African-American',
+    'Native-American / Alaskan-Native',
+    'Pacific-Islander / Native-Hawaiian',
+    'White / Caucasian',
+    'Other / Unknown'
+  ];
+  let nativeLang = '';
+  let birth = '';
+  let handed = '';
   const submitHIT = async () => {
     try {
       await db.ref(`participants/${params.workerId}`).update({
         age,
         sex,
+        ethnicity,
+        race,
+        nativeLang,
+        birth,
+        handed,
         feedback,
         HIT_complete: serverTime
       });
@@ -24,7 +42,10 @@
 
 <style>
   .age-input {
-    width: 2.5rem;
+    width: 3rem;
+  }
+  .lang-input {
+    width: 20rem;
   }
   .textarea-feedback {
     min-width: 80%;
@@ -68,6 +89,91 @@
                   Female
                 </label>
               </div>
+            </div>
+          </div>
+        </div>
+        <div class="field is-horizontal">
+          <div class="field-label">
+            <label class="label">Handedness</label>
+          </div>
+          <div class="field-body">
+            <div class="field is-narrow">
+              <div class="control">
+                <label class="radio">
+                  <input type="radio" bind:group={handed} value={'left'} />
+                  Left Handed
+                </label>
+                <label class="radio">
+                  <input type="radio" bind:group={handed} value={'right'} />
+                  Right Handed
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field is-horizontal">
+          <div class="field-label">
+            <label class="label">Ethnicity</label>
+          </div>
+          <div class="field-body">
+            <div class="field is-narrow">
+              <div class="control">
+                <label class="radio">
+                  <input type="radio" bind:group={ethnicity} value={'hispanic'} />
+                  Hispanic
+                </label>
+                <label class="radio">
+                  <input type="radio" bind:group={ethnicity} value={'not_hispanic'} />
+                  Not Hispanic
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field is-horizontal">
+          <div class="field-label is-normal">
+            <label class="label">Race</label>
+          </div>
+          <div class="field-body is-narrow">
+            <div class="field">
+              <div class="control">
+                <div class="select is-multiple">
+                  <select multiple bind:value={race}>
+                    {#each raceOptions as raceOption}
+                      <option value={raceOption}>{raceOption}</option>
+                    {/each}
+                  </select>
+                </div>
+              </div>
+              <p class="help">Cmd/Ctrl+Click to select multiple</p>
+            </div>
+          </div>
+        </div>
+        <div class="field is-horizontal">
+          <div class="field-label is-normal">
+            <label class="label">Native Language</label>
+          </div>
+          <div class="field-body is-narrow">
+            <div class="field">
+              <p class="control">
+                <input class="input lang-input" type="text" bind:value={nativeLang} />
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="field is-horizontal">
+          <div class="field-label is-normal">
+            <label class="label">Birth Location</label>
+          </div>
+          <div class="field-body is-narrow">
+            <div class="field">
+              <p class="control">
+                <input
+                  class="input lang-input"
+                  type="text"
+                  bind:value={birth}
+                  placeholder="City, State, Country" />
+              </p>
             </div>
           </div>
         </div>
